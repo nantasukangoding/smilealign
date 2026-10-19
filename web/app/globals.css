@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palet 2 inti + 1 aksen dari DESIGN.md */
+  --color-ink: #1e2a2f;           /* teks utama arang bernuansa teal */
+  --color-ink-soft: #5b6b70;      /* teks sekunder, 4.6:1 di atas putih */
+  --color-accent: #0e7c7b;        /* teal CTA; putih di atasnya 4.8:1 */
+  --color-accent-strong: #0a5a59; /* teal untuk teks/link di putih */
+  --color-surface: #f3f7f7;       /* blok sekunder netral */
+  --color-line: #dbe5e5;          /* border 1px */
+  --color-ringan: #0a5a59;
+  --color-sedang: #b45309;
+  --color-berat: #b91c1c;
+
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 16px;
+  --radius-btn: 10px;
+
+  /* Bayangan hanya untuk kartu hasil dan sheet/modal; sisanya flat (R-12). */
+  --shadow-lift: 0 10px 30px rgba(14, 60, 60, 0.12);
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Fokus keyboard selalu terlihat (R-32). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #ffffff;
+}

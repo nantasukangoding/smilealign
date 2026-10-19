@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+web/next-env.d.ts
+*.tsbuildinfo
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.uv/
+
+# data
+data/raw/
+data/processed/
+data/omni/
+data/*.zip
+data/*.tar
+!data/custom/.gitkeep
+
+# models
+models/
+*.pt
+*.onnx
+*.pth
+!models/.gitkeep
+
+# env & secrets
+.env
+.env.*
+
+# hack / user
+uploads/
+tmp/
+anti-slop/
+DESIGN.md
