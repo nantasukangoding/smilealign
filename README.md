@@ -54,9 +54,9 @@ smilealign/
 | 3 | Klasifikasi maloklusi multi-label (OMNI + EfficientNet) | kerangka; skor gabungan menyusul | scripts/train_classifier.py |
 
 Bobot v1 (`yolov8n-seg`, 100 epoch, T4): box mAP50 0,555 / mask mAP50 0,483 pada split
-validasi. Domain dataset adalah foto intraoral standar; foto senyum frontal kualitas rendah
-masil domain gap aktif (retrain v2 dengan data senyum terencana). Bila arka terdeteksi
-terlalu sedikit (<8 gigi atau rentang sempit), API menandai `insufficient: true` dan
+validasi. Latihan v2 sudah disiapkan (`scripts/colab_train_v2.ipynb`): campuran intraoral +
+AlphaDent (Apache-2.0) dengan 1 kelas `tooth`, imgsz 960, warm-start dari bobot v1. Bila arka
+terdeteksi terlalu sedikit (<8 gigi atau rentang sempit), API menandai `insufficient: true` dan
 frontend menampilkan tips foto, bukan indikasi palsu.
 
 Simulasi behel: bracket ditempatkan di centroid mask gigi; kawat digambar sebagai kurva

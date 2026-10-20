@@ -60,8 +60,11 @@ Kesimpulan jajaki Roboflow: tidak ada dataset segmentasi gigi untuk foto senyum 
 | [AlphaDent](https://github.com/ZFTurbo/AlphaDent) (arXiv 2507.22512) | 1.455 foto gigi DSLR, 295 pasien, mask instance gigi (9 kelas patologi) | **Apache-2.0**, dataset di HuggingFace/Kaggle/Zenodo | Kandidat campuran; domain DSLR klinis |
 | Teeth-SEG / IO150K (CVPR 2024) | 150k gambar, tapi hasil render 3D scan + gips | belum diterbitkan | Tunggu; skala besar tapi bukan foto kamera |
 
-Belum ada dataset foto senyum selfie publik. Rencana v2: campuran intraoral (Roboflow) +
-AlphaDent untuk ketangguhan foto dekat, plus fine-tune foto `data/custom/` milik user.
+Belum ada dataset foto senyum selfie publik. Rencana v2 (jalan): campuran intraoral + AlphaDent
+disatukan menjadi 1 kelas `tooth` (backend hanya pakai geometri instance; label FDI terbukti tak
+terpakai oleh aturan). Alat: `scripts/prepare_v2_mix.py` (lokal) dan
+`scripts/colab_train_v2.ipynb` (Colab: unduh AlphaDent dari HuggingFace otomatis, imgsz 960,
+warm-start dari bobot v1).
 
 ## 5. Domain gap dan dataset `data/custom/`
 
