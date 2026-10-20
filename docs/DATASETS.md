@@ -39,15 +39,31 @@ foto senyum frontal dari HP (lihat rencana retrain v2 di bawah).
 
 ## 3. Sitasi dataset yang DITOLAK (penting untuk transparansi)
 
-Tiga dataset yang awalnya direferensikan gagal verifikasi sebelum dipakai:
+Hasil verifikasi (thumbnail Visual Roboflow diperiksa langsung):
 
 | Dataset | Kegagalan |
 |---|---|
 | teeth_segmentation-mwdts (CC BY 4.0) | Hanya 7 gambar, task object detection, kelas (alveolar, pulp, filling canal) menandai **gambar rontgen**, bukan foto intraoral |
 | taqans/teethsegment (CC BY 4.0) | 0 gambar dan 0 versi publik sehingga tak bisa diunduh |
 | pidray-8gl3p/dental-segmentation2 (CC BY 4.0) | 521 gambar tetapi kelas berlabel "json" saja (anotasi tampak korup di halaman dataset) |
+| roboflow-jvuqo/teeth-po8ml (513 gambar, 6 kelas v1-v6) | Thumbnail berupa **rontgen panoramik**, bukan foto |
+| teethdataset/TeethSegmentationsNumberImages (1.941 gambar) | versi 0 (tak bisa diekspor) dan thumbnail **rontgen periapikal** |
+| teethdataset/ToothPulpdetect (1.441 gambar) | Thumbnail **rontgen periapikal** (label "pulp") |
 
-## 4. Domain gap dan dataset `data/custom/`
+Kesimpulan jajaki Roboflow: tidak ada dataset segmentasi gigi untuk foto senyum frontal.
+
+## 4. Kandidat domain foto (hasil jajaki 20 Okt 2026)
+
+| Sumber | Isi | Lisensi | Status |
+|---|---|---|---|
+| [SegmentAnyTooth](https://github.com/thangngoc89/SegmentAnyTooth) (J. Dental Sci. 2025) | 5.000 foto intraoral, 953 subjek; mask per gigi bernomor FDI; view: upper/lower/left/right/front | Kode MIT; **bobot lisensi non-komersial, minta via email agreement** | Kandidat utama; realisasi terdekat dari domain target |
+| [AlphaDent](https://github.com/ZFTurbo/AlphaDent) (arXiv 2507.22512) | 1.455 foto gigi DSLR, 295 pasien, mask instance gigi (9 kelas patologi) | **Apache-2.0**, dataset di HuggingFace/Kaggle/Zenodo | Kandidat campuran; domain DSLR klinis |
+| Teeth-SEG / IO150K (CVPR 2024) | 150k gambar, tapi hasil render 3D scan + gips | belum diterbitkan | Tunggu; skala besar tapi bukan foto kamera |
+
+Belum ada dataset foto senyum selfie publik. Rencana v2: campuran intraoral (Roboflow) +
+AlphaDent untuk ketangguhan foto dekat, plus fine-tune foto `data/custom/` milik user.
+
+## 5. Domain gap dan dataset `data/custom/`
 
 Dokter/klinik menggunakan foto standar, medis (pose khusus, pencahayaan terkontrol). Pengguna HP
 menyoll senyum dalam kendali lebih rendah. Untuk menjembatani:
@@ -59,7 +75,7 @@ menyoll senyum dalam kendali lebih rendah. Untuk menjembatani:
 - Tambahan foto bertahap; augmen (flip horizontal, rotasi kecil, geser brightness, kompresi
   JPEG) diaktifkan di config ultralytics tahap 1.
 
-## 5. Referensi metode/kelas
+## 6. Referensi metode/kelas
 
 - Multi-Class Malocclusion Detection on Standardized Intraoral Photographs Using YOLOv11,
   Dentistry Journal 14(1):60, doi 10.3390/dj14010060
