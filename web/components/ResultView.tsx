@@ -126,6 +126,7 @@ export function ResultView({
           rubberHex={rubber.hex}
           showMask={showMask}
           svgRef={svgRef}
+          insufficient={result.insufficient ?? false}
         />
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">

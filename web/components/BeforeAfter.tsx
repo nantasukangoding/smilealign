@@ -16,6 +16,7 @@ export function BeforeAfter({
   rubberHex,
   showMask,
   svgRef,
+  insufficient = false,
 }: {
   photoUrl: string;
   result: AnalyzeResponse;
@@ -23,6 +24,7 @@ export function BeforeAfter({
   rubberHex: string;
   showMask: boolean;
   svgRef: RefObject<SVGSVGElement | null>;
+  insufficient?: boolean;
 }) {
   const [pos, setPos] = useState(55);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,14 +70,16 @@ export function BeforeAfter({
           draggable={false}
           style={{ aspectRatio: `${dims.w} / ${dims.h}` }}
         />
-        <OverlaySvg
-          ref={svgRef}
-          overlay={result.overlay}
-          dims={dims}
-          type={type}
-          rubberHex={rubberHex}
-          showMask={showMask}
-        />
+        {!insufficient && (
+          <OverlaySvg
+            ref={svgRef}
+            overlay={result.overlay}
+            dims={dims}
+            type={type}
+            rubberHex={rubberHex}
+            showMask={showMask}
+          />
+        )}
       </div>
 
       <div
@@ -89,20 +93,28 @@ export function BeforeAfter({
       <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/70 px-2.5 py-1 text-xs font-semibold text-white">
         Asli
       </span>
-      <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-white">
-        Simulasi
-      </span>
-
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={Math.round(pos)}
-        onChange={(e) => setPos(Number(e.target.value))}
-        onPointerDown={(e) => e.stopPropagation()}
-        aria-label="Geser untuk membandingkan foto asli dengan simulasi behel"
-        className="absolute inset-0 z-10 h-full w-full cursor-ew-resize opacity-0"
-      />
+      {!insufficient && (
+        <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-white">
+          Simulasi
+        </span>
+      )}
+      {insufficient && (
+        <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-ink/70 px-2.5 py-1 text-xs font-semibold text-white">
+          Simulasi ditahan
+        </span>
+      )}
+      {!insufficient && (
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(pos)}
+          onChange={(e) => setPos(Number(e.target.value))}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Geser untuk membandingkan foto asli dengan simulasi behel"
+          className="absolute inset-0 z-10 h-full w-full cursor-ew-resize opacity-0"
+        />
+      )}
     </div>
   );
 }
