@@ -1,5 +1,5 @@
 """Pydantic model yang dikirim ke frontend untuk semua kebutuhan render overlay."""
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -22,11 +22,18 @@ class Bracket(BaseModel):
     height: float = Field(..., description="tinggi bracket normalisasi terhadap tinggi gambar")
 
 
+class JawNote(BaseModel):
+    """Catatan bila satu rahang terdeteksi tetapi terlalu sedikit untuk dirender."""
+    jaw: str = Field(..., description="rahang atas atau bawah")
+    message: str
+
+
 class Overlay(BaseModel):
     """Semua yang dibutuhkan frontend untuk menggambar mask + behel via SVG/canvas."""
     teeth: List[Tooth]
     brackets: List[Bracket]
-    archwire: Optional[str] = None
+    archwires: List[str] = Field(default_factory=list, description="satu path per rahang terbaca")
+    jaw_notes: List[JawNote] = Field(default_factory=list)
 
 
 class Problem(BaseModel):

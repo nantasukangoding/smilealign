@@ -23,7 +23,7 @@ export function ResultView({
   onRestart: () => void;
 }) {
   const [type, setType] = useState<BracesType>("metal");
-  const [rubber, setRubber] = useState<RubberColor>(RUBBER_COLORS[2]);
+  const [rubber, setRubber] = useState<RubberColor>(RUBBER_COLORS[0]);
   const [showMask, setShowMask] = useState(false);
   const [consultOpen, setConsultOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -129,6 +129,19 @@ export function ResultView({
           insufficient={result.insufficient ?? false}
         />
 
+        {!result.insufficient && result.overlay.jaw_notes.length > 0 && (
+          <div
+            role="status"
+            className="mt-3 flex items-start gap-3 rounded-xl border border-[#fdf1e4] bg-[#fdf1e4] p-4 text-[14px] text-ink"
+          >
+            <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
+            <span>
+              {result.overlay.jaw_notes.map((n) => n.message).join(" ")} Behel hanya diset pada
+              rahang yang terbaca jelas.
+            </span>
+          </div>
+        )}
+
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Card>
             <p className="mb-2 font-display text-sm font-semibold text-ink-soft">Jenis behel</p>
@@ -212,7 +225,7 @@ export function ResultView({
               ))}
             </ul>
             <p className="mt-3 text-[13px] text-ink-soft">
-              Simulasi behel tetap tampil sebagai gambaran tata letak, bukan hasil analisis.
+              Simulasi behel ditahan sampai foto diambil ulang yang lebih jelas.
             </p>
           </>
         ) : (

@@ -22,7 +22,7 @@ Respons JSON:
 ```json
 {
   "processed": {"width": 1280, "height": 850, "exif_rotated": false, "mode": "mock|model"},
-  "overlay":   {"teeth": [...], "brackets": [...], "archwire": "M0.1433 0.3884 C..."},
+  "overlay":   {"teeth": [...], "brackets": [...], "archwires": ["M0.1433 0.3884 C..."], "jaw_notes": []},
   "problems":  [{"key": "crowding", "label": "...", "severity": "ringan|sedang|berat",
                  "confidence": 0.83, "affected": [0, 1]}],
   "overall_severity": "ringan|sedang|berat",

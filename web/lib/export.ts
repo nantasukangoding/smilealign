@@ -1,6 +1,5 @@
 import jsPDF from "jspdf";
-import { scalePath } from "@/components/OverlaySvg";
-import { overlayStyleFor, WIRE_COLOR } from "./overlayStyle";
+import { buildOverlayMarkup } from "./overlayMarkup";
 import type { AnalyzeResponse, BracesType } from "./types";
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -19,55 +18,8 @@ function buildOverlaySvgMarkup(
   showMask: boolean
 ): string {
   const { width: w, height: h } = result.processed;
-  const overlay = result.overlay;
-  const style = overlayStyleFor(type, rubberHex);
-  const parts: string[] = [];
-
-  if (showMask) {
-    for (const t of overlay.teeth) {
-      parts.push(
-        `<polygon points="${t.polygon
-          .map(([x, y]) => `${x * w},${y * h}`)
-          .join(" ")}" fill="rgba(14,124,123,0.24)" stroke="#0e7c7b" stroke-width="${Math.max(2, w * 0.004)}"/>`
-      );
-    }
-  }
-
-  if (style.alignerFill) {
-    for (const t of overlay.teeth) {
-      parts.push(
-        `<polygon points="${t.polygon
-          .map(([x, y]) => `${x * w},${y * h}`)
-          .join(" ")}" fill="${style.alignerFill}" stroke="${style.alignerStroke}" stroke-width="${Math.max(1.5, w * 0.003)}"/>`
-      );
-    }
-  }
-
-  if (style.showWire && overlay.archwire) {
-    parts.push(
-      `<path d="${scalePath(overlay.archwire, w, h)}" fill="none" stroke="${WIRE_COLOR}" stroke-width="${Math.max(3, w * 0.005)}" stroke-linecap="round"/>`
-    );
-  }
-
-  if (style.showBrackets) {
-    for (const b of overlay.brackets) {
-      const cx = b.center[0] * w;
-      const cy = b.center[1] * h;
-      const bw = b.width * w;
-      const bh = b.height * h;
-      parts.push(
-        `<g transform="translate(${cx} ${cy}) rotate(${b.angle})">` +
-          (style.tie
-            ? `<rect x="${-bw * 0.62}" y="${-bh * 0.62}" width="${bw * 1.24}" height="${bh * 1.24}" rx="${bw * 0.3}" fill="${style.tie}" opacity="0.9"/>`
-            : "") +
-          `<rect x="${-bw / 2}" y="${-bh / 2}" width="${bw}" height="${bh}" rx="${bw * 0.24}" fill="${style.bracket.fill}" stroke="${style.bracket.stroke}" stroke-width="${Math.max(1, w * 0.002)}"/>` +
-          `<rect x="${-bw * 0.42}" y="${-bh * 0.1}" width="${bw * 0.84}" height="${bh * 0.2}" rx="${bh * 0.1}" fill="#ffffff" opacity="0.35"/>` +
-          `</g>`
-      );
-    }
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${parts.join("")}</svg>`;
+  const inner = buildOverlayMarkup(result.overlay, w, h, { type, rubberHex, showMask });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`;
 }
 
 function svgToImage(markup: string): Promise<HTMLImageElement> {

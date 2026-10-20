@@ -46,9 +46,58 @@ def test_brackets_cover_teeth_and_archwire_in_range():
     teeth = _teeth(img)
     overlay = build_overlay(teeth)
     assert len(overlay.brackets) == len(teeth)
-    assert overlay.archwire and overlay.archwire.startswith("M")
+    assert len(overlay.archwires) == 1
+    assert overlay.archwires[0].startswith("M")
     for b in overlay.brackets:
         assert 0 <= b.center[0] <= 1 and 0 <= b.center[1] <= 1
+
+
+def _make_teeth(upper, lower):
+    from app.schemas import Tooth
+    idx = 0
+    teeth = []
+    for cy, n in ((0.40, upper), (0.62, lower)):
+        for i in range(n):
+            cx = 0.12 + i * (0.76 / max(n - 1, 1))
+            t = np.linspace(0, 2 * math.pi, 24, endpoint=False)
+            poly = np.stack([cx + 0.03 * np.cos(t), cy + 0.025 * np.sin(t)], axis=1).tolist()
+            teeth.append(Tooth(index=idx, polygon=poly, centroid=[cx, cy],
+                               box=[cx - 0.03, cy - 0.025, cx + 0.03, cy + 0.025], angle=0))
+            idx += 1
+    return teeth
+
+
+def test_two_jaws_two_wires_snapped_to_curve():
+    teeth = _make_teeth(upper=8, lower=8)
+    overlay = build_overlay(teeth)
+    assert len(overlay.archwires) == 2
+    assert len(overlay.brackets) == 16
+    widths = {round(b.width, 4) for b in overlay.brackets}
+    assert len(widths) == 1  # ukuran seragam per kegunaan mediana
+    centers = sorted({b.center[0] for b in overlay.brackets})
+    assert len(centers) == len({t.centroid[0] for t in teeth})  # tetap di gigi asal
+    for b in overlay.brackets:
+        assert 0 < b.center[1] < 0.7
+        assert -30 <= b.angle <= 30
+
+
+def test_small_jaw_withheld_with_note():
+    teeth = _make_teeth(upper=9, lower=3)
+    overlay = build_overlay(teeth)
+    assert len(overlay.archwires) == 1
+    assert len(overlay.brackets) == 9
+    assert len(overlay.jaw_notes) == 1
+    note = overlay.jaw_notes[0]
+    assert note.jaw == "bawah"
+    assert "tampak depan" in note.message
+
+
+def test_two_small_jaws_both_notes_no_brackets():
+    teeth = _make_teeth(upper=5, lower=5)
+    overlay = build_overlay(teeth)
+    assert overlay.brackets == []
+    assert overlay.archwires == []
+    assert {n.jaw for n in overlay.jaw_notes} == {"atas", "bawah"}
 
 
 def test_spacing_detection_when_gaps_wide():

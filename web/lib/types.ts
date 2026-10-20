@@ -16,10 +16,16 @@ export interface Bracket {
   height: number;
 }
 
+export interface JawNote {
+  jaw: string;
+  message: string;
+}
+
 export interface Overlay {
   teeth: Tooth[];
   brackets: Bracket[];
-  archwire: string | null;
+  archwires: string[];
+  jaw_notes: JawNote[];
 }
 
 export interface Problem {

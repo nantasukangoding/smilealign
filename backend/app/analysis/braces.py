@@ -1,14 +1,23 @@
-"""Penataan bracket + jalur archwire (Catmull-Rom ke kurva Bezier, rata-rata rapi).
+"""Penataan bracket + jalur archwire per rahang.
 
-Decoder: frontend menggambarkan path <svg path d>, pusat bracket <rect> dengan rotasi,
-semua dalam koordinat normalisasi 0-1. Koordinat x normalisasi lebar, y normalisasi tinggi.
+Gigi dipisah jadi baris atas dan bawah (bila dideteksi dua rahang); tiap rahang
+dapat satu kurva polinomial derajat 2 melalui centroid giginya. Bracket di-snap
+ke kurva supaya simulasi terlihat sudah tertata, tidak meniru keriangan gigi.
+Archwire berupa Catmull-Rom yang dikonversi ke kurva Bezier.
 """
 import math
 from typing import List, Sequence, Tuple
 
-from app.schemas import Bracket, Overlay, Tooth
+import numpy as np
 
-OPENER = "m"
+from app.schemas import Bracket, JawNote, Overlay, Tooth
+
+JAW_MIN_TEETH = 6
+GAP_RATIO = 2.5
+GAP_MIN_HEIGHT = 0.6
+SNAP_UP_RATIO = 0.15
+BRACKET_WIDTH_RATIO = 0.45
+ANGLE_LIMIT = 30.0
 
 
 def _catmull_rom_points(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -26,7 +35,7 @@ def _catmull_rom_points(points: Sequence[Tuple[float, float]]) -> List[Tuple[flo
 
 
 def _catmull_rom_path(pts: Sequence[Tuple[float, float]]) -> str:
-    """Konversi Catmull-Rom ke kurva kubik Bezier, urutan numor dan serifikat 4 desimal."""
+    """Konversi Catmull-Rom ke kurva kubik Bezier, urutan rapi dan presisi 4 desimal."""
     if len(pts) < 2:
         return ""
     d = [f"M{pts[0][0]:.4f} {pts[0][1]:.4f}"]
@@ -39,25 +48,56 @@ def _catmull_rom_path(pts: Sequence[Tuple[float, float]]) -> str:
     return " ".join(d)
 
 
-def build_overlay(teeth: List[Tooth]) -> Overlay:
-    """Kembalikan Overlay: bracket untuk tiap gigi (posisi & orientasi) + string path archwire."""
-    if not teeth:
-        return Overlay(teeth=[], brackets=[], archwire=None)
-    ordered = sorted(teeth, key=lambda t: t.centroid[0])
-    hard_pts = [(t.centroid[0], t.centroid[1]) for t in ordered]
+def _split_jaws(teeth: List[Tooth]) -> List[List[Tooth]]:
+    """Klaster gigi jadi satu atau dua baris memakai celah vertikal terbesar.
 
-    arcs = _catmull_rom_points(hard_pts)
-    archwire = _catmull_rom_path(arcs)
+    Celah dianggap pemisah rahang bila jauh melebihi selang antar gigi lain
+    dan sepadan dengan tinggi mahkota gigi. Baris pertama berada lebih atas.
+    """
+    if len(teeth) < 4:
+        return [teeth]
+    ordered = sorted(teeth, key=lambda t: t.centroid[1])
+    ys = [t.centroid[1] for t in ordered]
+    gaps: List[Tuple[float, int]] = [(ys[i + 1] - ys[i], i) for i in range(len(ordered) - 1)]
+    if not gaps:
+        return [teeth]
+    by_size = sorted(gaps, reverse=True)
+    largest, idx = by_size[0]
+    heights = [t.box[3] - t.box[1] for t in teeth]
+    h_med = float(np.median(heights))
+    if largest < GAP_MIN_HEIGHT * h_med or (len(by_size) > 1 and largest < GAP_RATIO * by_size[1][0]):
+        return [teeth]
+    upper, lower = ordered[: idx + 1], ordered[idx + 1:]
+    if len(upper) < 2 or len(lower) < 2:
+        return [teeth]
+    return [upper, lower]
 
-    brackets = []
+
+def _snap_to_curve(jaw: Sequence[Tooth]) -> Tuple[List[Bracket], str]:
+    """Fit kurva lewat centroid satu rahang, snap bracket ke sana, gambar archwire.
+
+    Ukuran bracket seragam sekitar 45% lebar gigi rahang itu; posisi dinaikkan
+    sedikit ke arah tepi mahkota; sudut ikuti kemiringan kurva, bukan gigi.
+    """
+    ordered = sorted(jaw, key=lambda t: t.centroid[0])
+    xs = np.array([t.centroid[0] for t in ordered])
+    ys = np.array([t.centroid[1] for t in ordered])
+    coef = np.polyfit(xs, ys, 2)
+
+    widths = [t.box[2] - t.box[0] for t in ordered]
+    heights = [t.box[3] - t.box[1] for t in ordered]
+    size = min(0.07, max(0.018, BRACKET_WIDTH_RATIO * float(np.median(widths))))
+    height = min(0.085, size * 1.15)
+    lift = SNAP_UP_RATIO * float(np.median(heights))
+
+    brackets: List[Bracket] = []
+    pts: List[Tuple[float, float]] = []
     for t in ordered:
-        idx_in_order = list(map(lambda tt: tt.index, ordered)).index(t.index)
-        cx, cy = t.centroid
-        prev_x, prev_y = arcs[idx_in_order]
-        next_x, next_y = arcs[idx_in_order + 2]
-        angle = math.degrees(math.atan2(next_y - prev_y, next_x - prev_x))
-        size = min(0.058, max(0.03, t.box[2] - t.box[0]) * 1.05)
-        height = size * 1.15
+        cx = t.centroid[0]
+        cy = min(1.0, max(0.0, float(np.polyval(coef, cx)) - lift))
+        slope = 2 * coef[0] * cx + coef[1]
+        angle = max(-ANGLE_LIMIT, min(ANGLE_LIMIT, math.degrees(math.atan(slope))))
+        pts.append((cx, cy))
         brackets.append(Bracket(
             tooth=t.index,
             center=[round(cx, 4), round(cy, 4)],
@@ -65,4 +105,32 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
             width=round(size, 4),
             height=round(height, 4),
         ))
-    return Overlay(teeth=teeth, brackets=brackets, archwire=archwire)
+    return brackets, _catmull_rom_path(_catmull_rom_points(pts))
+
+
+def build_overlay(teeth: List[Tooth]) -> Overlay:
+    """Kembalikan Overlay: bracket per rahang + archwire per rahang + catatan rahang kurang terbaca."""
+    if not teeth:
+        return Overlay(teeth=[], brackets=[], archwires=[])
+    jaws = _split_jaws(teeth)
+    labels = ["atas", "bawah"] if len(jaws) == 2 else ["gigi"]
+    brackets: List[Bracket] = []
+    archwires: List[str] = []
+    notes: List[JawNote] = []
+    for jaw, label in zip(jaws, labels):
+        if len(jaw) < JAW_MIN_TEETH:
+            if label != "gigi":
+                notes.append(JawNote(
+                    jaw=label,
+                    message=f"Rahang {label} kurang jelas, coba foto gigi tampak depan.",
+                ))
+            continue
+        jaw_brackets, wire = _snap_to_curve(jaw)
+        brackets.extend(jaw_brackets)
+        archwires.append(wire)
+    return Overlay(
+        teeth=teeth,
+        brackets=brackets,
+        archwires=archwires,
+        jaw_notes=notes if len(jaws) == 2 else [],
+    )
