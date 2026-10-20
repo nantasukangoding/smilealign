@@ -63,3 +63,27 @@ def test_spacing_detection_when_gaps_wide():
                          box=[cx - rx, 0.5 - ry, cx + rx, 0.5 + ry], angle=0))
     cols = detect_problems(pts)
     assert any(p.key == "spacing" for p in cols)
+
+
+def test_arch_coverage_rejects_sparse_cluster():
+    from app.analysis.rules import arch_coverage_ok
+    from app.schemas import Tooth
+
+    def cluster(cx0):
+        teeth = []
+        for i in range(5):
+            cx = cx0 + i * 0.02
+            teeth.append(Tooth(index=i, polygon=[[cx, 0.42]] * 8, centroid=[cx, 0.45],
+                               box=[cx - 0.01, 0.42, cx + 0.01, 0.48], angle=0))
+        return teeth
+
+    assert not arch_coverage_ok(cluster(0.30))  # gumpalan sempit di tengah kiri
+    assert not arch_coverage_ok(cluster(0.10)[:3])  # gigi terlalu sedikit
+
+    arc = []
+    for i in range(10):
+        cx = 0.08 + i * 0.09
+        cy = 0.42 + 0.10 * (2 * (i + 0.5) / 10 - (2 * (i + 0.5) / 10) ** 2)
+        arc.append(Tooth(index=i, polygon=[[cx, cy]] * 8, centroid=[cx, cy],
+                         box=[cx - 0.01, cy - 0.02, cx + 0.01, cy + 0.02], angle=0))
+    assert arch_coverage_ok(arc)

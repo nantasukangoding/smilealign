@@ -2,7 +2,7 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.analysis.braces import build_overlay
-from app.analysis.rules import detect_problems, recommend
+from app.analysis.rules import PHOTO_TIPS, arch_coverage_ok, detect_problems, recommend
 from app.image_utils import ImageError, MAX_UPLOAD_BYTES, load_and_prepare
 from app.segmentation import run_segmentation
 from app.schemas import AnalyzeResponse, Overlay
@@ -25,15 +25,15 @@ async def analyze(file: UploadFile = File(...)):
                             detail="Tidak ada gigi yang terdeteksi. Coba foto yang lebih jelas.")
 
     overlay: Overlay = build_overlay(teeth)
-    problems = detect_problems(teeth)
+    insufficient = not arch_coverage_ok(teeth)
     return AnalyzeResponse(
         processed=dict(width=img.width, height=img.height, exif_rotated=exif_rotated,
                        mode=mode),
         overlay=overlay,
-        problems=problems,
-        overall_severity=max((p.severity for p in problems),
-                             key=lambda s: {"ringan": 1, "sedang": 2, "berat": 3}.get(s, 1),
-                             default="ringan"),
-        recommendations=recommend(problems),
+        problems=[] if insufficient else detect_problems(teeth),
+        overall_severity="ringan",
+        recommendations=list(PHOTO_TIPS) if insufficient else recommend(
+            detect_problems(teeth)),
+        insufficient=insufficient,
         mock=(mode == "mock"),
     )

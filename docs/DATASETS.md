@@ -16,6 +16,16 @@ Terakhir diperiksa: 20 Oktober 2026.
 | Cara unduh | `python scripts/download_data.py --source roboflow` (butuh `ROBOFLOW_API_KEY` akun gratis Roboflow) |
 | Sitasi | Salin BibTeX versi terbaru dari halaman dataset (judul *Intraoral Tooth Detection Dataset*, 2025) |
 
+### Hasil latihan v1 (Companion Colab T4, 20 Okt 2026)
+
+| Model | Epoch | Split | box mAP50 | box mAP50-95 | mask mAP50 | mask mAP50-95 |
+|---|---|---|---|---|---|---|
+| yolov8n-seg, imgsz 640, batch 16 | 100 (patience 15) | valid+test | 0,555 | 0,372 | 0,483 | 0,212 |
+
+Catatan: kelas junk `56` dan `327` (masing-masing 1 anotasi) dibuang saat persiapan; skripnya
+`scripts/clean_labels.py`. Domain dataset = foto intraoral standar; performancenya turun pada
+foto senyum frontal dari HP (lihat rencana retrain v2 di bawah).
+
 ## 2. Klasifikasi maloklusi (Tahap 3)
 
 | Kriteria | Nilai |

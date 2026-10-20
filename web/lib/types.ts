@@ -43,6 +43,8 @@ export interface AnalyzeResponse {
   problems: Problem[];
   overall_severity: Severity;
   recommendations: string[];
+  insufficient?: boolean;
+  mock?: boolean;
 }
 
 export type BracesType = "metal" | "keramik" | "clear";

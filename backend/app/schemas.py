@@ -50,3 +50,6 @@ class AnalyzeResponse(BaseModel):
     problems: List[Problem]
     overall_severity: str
     recommendations: List[str]
+    insufficient: bool = Field(False, description="True bila arka gigi tidak cukup lengkap untuk aturan")
+    mock: bool = Field(False, description="True bila pakai segmentasi mock")
+

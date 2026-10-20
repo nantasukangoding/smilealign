@@ -3,6 +3,9 @@
 Semua ukuran berasal dari geometri poligon, bukan probabilitas model, sehingga
 "confidence" di sini margin aturan (validitas geometris) dan bukan probabilitas diagnosis.
 Ambang tetap ditulis sebagai konstanta supaya mudah diuji dan diatur ulang.
+
+Gate kualitas (arch_coverage_ok) menjaga aturan tidak berjalan atas arka yang terlalu sedikit
+atau terlalu sempit terdeteksi.
 """
 from typing import List, Tuple
 
@@ -25,6 +28,20 @@ CROWD_MILD, CROWD_HEAVY = 0.90, 0.78
 SPACING_OPEN, SPACING_HEAVY = 1.18, 1.55
 ROT_MILD, ROT_HEAVY = 12.0, 31.0
 TILT_MILD, TILT_HEAVY = 0.20, 0.52
+
+# Pengaman data: aturan hanya sah bila arka gigi terlihat cukup lengkap.
+MIN_TEETH_FOR_RULES = 8    # di bawah ini, arka dianggap terlalu sedikit untuk dinilai
+MIN_X_SPAN = 0.25          # rentang centroid horizontal minimal (lebar gambar)
+MAX_Y_OVER_X = 1.30        # arka tidak mungkin jauh lebih tinggi daripada lebarnya
+
+PHOTO_TIPS: List[str] = [
+    "Ambil ulang foto agar analisis bisa dibaca ulang penuh:",
+    "Jarak 10-20 cm; gigi memenuhi bingkai foto.",
+    "Cahaya terang dan merata; hindari bayangan di wajah.",
+    "Senyum lebar, bibir tidak menutupi gigi; arahkan kamera tegak lurus gigi.",
+    "Foto langsung dengan kamera, bukan memotret layar HP lain (menghindari blur dan pantulan).",
+    "Pastikan satu rahang terlihat penuh dari geraham kiri ke kanan.",
+]
 
 _THRESHOLDS = {
     "crowding": (CROWD_MILD, CROWD_HEAVY, "down"),
@@ -64,6 +81,19 @@ def _overall(problems: List[Problem]) -> str:
     if not problems:
         return "ringan"
     return max(problems, key=lambda p: SEVERITY_RANK[p.severity]).severity
+
+
+def arch_coverage_ok(teeth: List[Tooth]) -> bool:
+    """Gate kualitas: bila False, hasil aturan tidak sah (kembalikan tips foto saja)."""
+    if len(teeth) < MIN_TEETH_FOR_RULES:
+        return False
+    xs = [t.centroid[0] for t in teeth]
+    ys = [t.centroid[1] for t in teeth]
+    x_span = max(xs) - min(xs)
+    y_span = max(ys) - min(ys)
+    if x_span < MIN_X_SPAN:
+        return False
+    return y_span <= MAX_Y_OVER_X * x_span
 
 
 def detect_problems(teeth: List[Tooth]) -> List[Problem]:

@@ -16,6 +16,7 @@ Pemakaian:
     python scripts/download_data.py --source omni       # gdown di Drive
 """
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -37,17 +38,44 @@ def download_roboflow(target: Path) -> None:
         sys.exit("Set ROBOFLOW_API_KEY terlebih dahulu (akun gratis Roboflow).")
     target.mkdir(parents=True, exist_ok=True)
     zip_path = target / "intraoral.zip"
+    # Endpoint versi/format inilah yang menyerahkan tautan export (dipakai juga SDK resmi);
+    # tanpa "/{format}" API hanya membalas metadata.
     url = (
-        f"https://api.roboflow.com/{ROBOFLOW_PROJECT}/{ROBOFLOW_VERSION}"
-        f"?api_key={api_key}&format=yolov8"
+        f"https://api.roboflow.com/{ROBOFLOW_PROJECT}/{ROBOFLOW_VERSION}/yolov8"
+        f"?api_key={api_key}&nocache=true"
     )
-    print("Mengunduh", url)
-    with urlopen(url) as res, open(zip_path, "wb") as fh:
+    print("Menarik tautan export:")
+    with urlopen(url) as res:
+        body = json.load(res)
+    link = body.get("export", {}).get("link")
+    if not link:
+        sys.exit(f"Export belum siap atau gagal: {body}")
+    print("Mengunduh", link)
+    with urlopen(link) as res, open(zip_path, "wb") as fh:
         shutil.copyfileobj(res, fh)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(target)
     zip_path.unlink()
+    # Beberapa pembuat arsip memakai pemisah Windows; rapikan nama berkasnya.
+    fix_windows_paths(target)
     print("Selesai. Struktur:", target)
+
+
+def fix_windows_paths(root: Path) -> None:
+    """Gabungkan berkas yang namanya mengandung '\\' (artefak zip Windows) menjadi folder."""
+    for p in sorted(root.rglob("*"), reverse=True):
+        if "\\" not in p.name:
+            continue
+        flat_name = p.name
+        nested = p.parent / flat_name.replace("\\", os.sep)
+        nested.parent.mkdir(parents=True, exist_ok=True)
+        p.rename(nested)
+        # kosongkan folder induk bila kosong
+        parent = p.parent
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
 
 
 def download_omni(target: Path) -> None:

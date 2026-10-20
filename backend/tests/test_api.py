@@ -1,8 +1,12 @@
 import io
+import os
 
 import pytest
 from PIL import Image
 from starlette.testclient import TestClient
+
+# Penuhkan mock supaya tes skema tidak bergantung ada/tidaknya bobot model.
+os.environ.setdefault("SMILEALIGN_FORCE_MOCK", "1")
 
 from app.image_utils import ImageError, MAX_UPLOAD_BYTES, load_and_prepare
 from app.main import app

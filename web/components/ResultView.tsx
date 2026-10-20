@@ -83,12 +83,15 @@ export function ResultView({
         <div>
           <h2 className="font-display text-xl font-semibold">Hasil analisis</h2>
           <p className="text-[13.5px] text-ink-soft">
-            Dari {result.overlay.teeth.length} gigi tersegmentasi, {result.problems.length}{" "}
-            indikasi terbaca. Keparahan keseluruhan:{" "}
-            {SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity}.
+            Dari {result.overlay.teeth.length} gigi tersegmentasi,{" "}
+            {result.insufficient
+              ? "arka masih terlalu sempit untuk dinilai."
+              : `${result.problems.length} indikasi terbaca. Keparahan keseluruhan: ${
+                  SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity
+                }.`}
           </p>
         </div>
-        <SeverityBadge severity={result.overall_severity} />
+        {!result.insufficient && <SeverityBadge severity={result.overall_severity} />}
       </Card>
       {isMock && (
         <div
@@ -189,37 +192,63 @@ export function ResultView({
       </section>
 
       <Card className={exportError ? "ring-1 ring-berat" : ""}>
-        <h3 className="mb-3 font-display text-lg font-semibold">Kemungkinan yang terbaca</h3>
-        {result.problems.length === 0 ? (
-          <div className="flex items-start gap-3 rounded-xl bg-surface p-4">
-            <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-            <p className="text-[15px] text-ink">
-              Tidak ada indikasi masalah posisi dari aturan geometris yang dipakai. Tetap lakukan
-              kontrol ke dokter gigi minimal setiap 6 bulan.
+        {result.insufficient ? (
+          <>
+            <h3 className="mb-3 font-display text-lg font-semibold">Foto kurang terbaca</h3>
+            <div className="flex items-start gap-3 rounded-xl bg-surface p-4">
+              <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
+              <p className="text-[15px] text-ink">
+                Hanya {result.overlay.teeth.length} gigi yang terbaca jelas. Analisis posisi tidak
+                dijalankan supaya tidak menyesatkan. Ikuti tips berikut lalu coba lagi:
+              </p>
+            </div>
+            <ul className="mt-3 space-y-2">
+              {result.recommendations.map((tip, i) => (
+                <li key={i} className="flex items-start gap-2 text-[14.5px] text-ink">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+                  {tip}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[13px] text-ink-soft">
+              Simulasi behel tetap tampil sebagai gambaran tata letak, bukan hasil analisis.
             </p>
-          </div>
+          </>
         ) : (
-          <ul className="divide-y divide-line">
-            {result.problems.map((p) => (
-              <li key={p.key} className="flex items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold">{p.label}</p>
-                  <p className="text-[13px] text-ink-soft">
-                    {p.affected.length > 0
-                      ? `Menyangkut gigi ${p.affected.map(toRoman).join(", ")}`
-                      : "Sebagian gigi"}
-                  </p>
-                </div>
-                <ConfidencePill value={p.confidence} />
-                <SeverityBadge severity={p.severity} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <h3 className="mb-3 font-display text-lg font-semibold">Kemungkinan yang terbaca</h3>
+            {result.problems.length === 0 ? (
+              <div className="flex items-start gap-3 rounded-xl bg-surface p-4">
+                <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                <p className="text-[15px] text-ink">
+                  Tidak ada indikasi masalah posisi dari aturan geometris yang dipakai. Tetap
+                  lakukan kontrol ke dokter gigi minimal setiap 6 bulan.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {result.problems.map((p) => (
+                  <li key={p.key} className="flex items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-semibold">{p.label}</p>
+                      <p className="text-[13px] text-ink-soft">
+                        {p.affected.length > 0
+                          ? `Menyangkut gigi ${p.affected.map(toRoman).join(", ")}`
+                          : "Sebagian gigi"}
+                      </p>
+                    </div>
+                    <ConfidencePill value={p.confidence} />
+                    <SeverityBadge severity={p.severity} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex items-center gap-2 text-[13px] text-ink-soft">
+              <AlertIcon className="h-4 w-4 text-sedang" />
+              Nilai keyakinan adalah margin dari aturan geometris, bukan probabilitas diagnosis.
+            </div>
+          </>
         )}
-        <div className="mt-3 flex items-center gap-2 text-[13px] text-ink-soft">
-          <AlertIcon className="h-4 w-4 text-sedang" />
-          Nilai keyakinan adalah margin dari aturan geometris, bukan probabilitas diagnosis.
-        </div>
       </Card>
 
       <Card>
@@ -299,11 +328,21 @@ function buildSummary(result: AnalyzeResponse, type: BracesType): string {
   const jenis = BRACES_OPTIONS.find((o) => o.id === type)?.label ?? type;
   const lines = [
     "Ringkasan SmileAlign (estimasi edukatif, bukan diagnosis)",
-    `Keparahan keseluruhan: ${SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity}`,
+  ];
+  if (result.insufficient) {
+    lines.push("Foto tidak terbaca cukup (arka gigi tidak lengkap). Posisi gigi belum dinilai.");
+    lines.push(`Referensi tata letak: behel ${jenis.toLowerCase()}.`);
+    lines.push("Minta pengguna mengambil ulang foto memakai tips aplikasi.");
+    return lines.join("\n");
+  }
+  lines.push(
+    `Keparahan keseluruhan: ${SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity}`
+  );
+  lines.push(
     result.problems.length > 0
       ? "Temuan dari foto:"
-      : "Tidak ada indikasi masalah posisi dari aturan geometris.",
-  ];
+      : "Tidak ada indikasi masalah posisi dari aturan geometris."
+  );
   for (const p of result.problems) {
     lines.push(
       `- ${p.label}` +

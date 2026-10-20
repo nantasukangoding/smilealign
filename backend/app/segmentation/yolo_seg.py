@@ -20,7 +20,7 @@ def segment_with_yolo(img: Image, weights_path: Path) -> List[Tooth]:
         raise RuntimeError("paket ultralytics belum terpasang di backend") from exc
 
     model = YOLO(str(weights_path))
-    results = model.predict(img, conf=0.35, verbose=False)
+    results = model.predict(img, conf=0.25, imgsz=1024, verbose=False)
     if not results or results[0].masks is None:
         return []
 
