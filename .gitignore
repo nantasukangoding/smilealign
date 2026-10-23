@@ -32,9 +32,9 @@ models/
 # env & secrets
 .env
 .env.*
+!web/.env.example
 
 # hack / user
 uploads/
 tmp/
 anti-slop/
-DESIGN.md
