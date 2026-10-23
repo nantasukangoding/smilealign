@@ -1,13 +1,13 @@
 "use client";
 
 import { useReducer } from "react";
-import Link from "next/link";
 import { ConsentStep } from "@/components/ConsentStep";
 import { CaptureStep } from "@/components/CaptureStep";
 import { ProcessingView } from "@/components/ProcessingView";
 import { ResultView } from "@/components/ResultView";
 import { Button, Card, StageProgress } from "@/components/ui";
 import { RetryIcon } from "@/components/icons";
+import { Wordmark } from "@/components/Wordmark";
 import type { AnalyzeError, AnalyzeResponse } from "@/lib/types";
 
 type Stage = "consent" | "capture" | "preview" | "processing" | "result" | "error";
@@ -72,11 +72,9 @@ export default function AnalisisPage() {
     state.stage === "consent" ? "consent" : state.stage === "result" ? "hasil" : "foto";
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col bg-white">
       <header className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row sm:px-6">
-        <Link href="/" className="font-display text-lg font-bold">
-          SmileAlign<span className="text-accent">.</span>
-        </Link>
+        <Wordmark className="font-display text-lg font-bold text-ink" />
         <StageProgress current={stageForProgress} />
       </header>
 

@@ -28,6 +28,18 @@ body {
   font-family: var(--font-body);
 }
 
+/* Halaman depan bisa gelap mengikuti sistem. Latar html ikut gelap supaya
+   area overscroll di ponsel tidak menyisakan pita putih. */
+html {
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:has([data-home]) {
+    background-color: #0b1220;
+  }
+}
+
 /* Fokus keyboard selalu terlihat (R-32). */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-accent);
