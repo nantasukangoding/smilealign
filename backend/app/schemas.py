@@ -20,6 +20,7 @@ class Bracket(BaseModel):
     angle: float
     width: float = Field(..., description="lebar bracket normalisasi terhadap lebar gambar")
     height: float = Field(..., description="tinggi bracket normalisasi terhadap tinggi gambar")
+    jaw: str = Field("gigi", description="rahang atas, bawah, atau gigi bila hanya satu baris")
 
 
 class JawNote(BaseModel):

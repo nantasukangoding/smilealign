@@ -14,6 +14,7 @@ export interface Bracket {
   angle: number;
   width: number;
   height: number;
+  jaw: string;
 }
 
 export interface JawNote {

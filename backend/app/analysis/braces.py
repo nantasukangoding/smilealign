@@ -73,11 +73,36 @@ def _split_jaws(teeth: List[Tooth]) -> List[List[Tooth]]:
     return [upper, lower]
 
 
-def _snap_to_curve(jaw: Sequence[Tooth]) -> Tuple[List[Bracket], str]:
-    """Fit kurva lewat centroid satu rahang, snap bracket ke sana, gambar archwire.
+def _dedupe(teeth: Sequence[Tooth]) -> List[Tooth]:
+    """Buang deteksi ganda untuk satu gigi yang sama.
 
-    Ukuran bracket seragam sekitar 45% lebar gigi rahang itu; posisi dinaikkan
-    sedikit ke arah tepi mahkota; sudut ikuti kemiringan kurva, bukan gigi.
+    Model kadang mengeluarkan dua mask untuk satu gigi, dengan pusat nyaris
+    identik. Ambangnya sengaja ketat: gigi bertetangga yang berdesakan punya
+    pusat berbeda dan harus tetap dihitung.
+    """
+    if not teeth:
+        return []
+    keep: List[Tooth] = []
+    for t in sorted(teeth, key=lambda x: (x.box[2] - x.box[0]) * (x.box[3] - x.box[1]), reverse=True):
+        w_t = t.box[2] - t.box[0]
+        h_t = t.box[3] - t.box[1]
+        dup = any(
+            abs(t.centroid[0] - k.centroid[0]) < 0.1 * min(w_t, k.box[2] - k.box[0])
+            and abs(t.centroid[1] - k.centroid[1]) < 0.1 * min(h_t, k.box[3] - k.box[1])
+            for k in keep
+        )
+        if not dup:
+            keep.append(t)
+    return sorted(keep, key=lambda x: x.index)
+
+
+def _snap_to_curve(jaw: Sequence[Tooth], label: str = "gigi") -> Tuple[List[Bracket], str]:
+    """Fit kurva lewat centroid satu rahang, lalu sebar bracket merata di atasnya.
+
+    Bracket tidak lagi mengikuti posisi tiap gigi (yang berdesakan membuatnya
+    menumpuk), melainkan disebar rata sepanjang kurva dari gigi terkiri ke
+    gigi terkanan. Sudut bracket ikut kemiringan kurva, ukurannya seragam
+    sekitar 45% lebar gigi mediana.
     """
     ordered = sorted(jaw, key=lambda t: t.centroid[0])
     xs = np.array([t.centroid[0] for t in ordered])
@@ -89,21 +114,38 @@ def _snap_to_curve(jaw: Sequence[Tooth]) -> Tuple[List[Bracket], str]:
     size = min(0.07, max(0.018, BRACKET_WIDTH_RATIO * float(np.median(widths))))
     height = min(0.085, size * 1.15)
     lift = SNAP_UP_RATIO * float(np.median(heights))
+    direction = -1.0 if label == "bawah" else 1.0
+
+    n = len(ordered)
+    x_min, x_max = float(xs.min()), float(xs.max())
+    span = x_max - x_min
+    # Jumlah bracket dibatasi supaya jaraknya tidak lebih rapat dari lebar
+    # bracket itu sendiri; kalau tidak, bracket saling menumpuk di rahang sempit.
+    max_fit = max(1, int(span / (size * 1.35)) + 1)
+    count = max(2, min(n, max_fit)) if n > 1 else 1
 
     brackets: List[Bracket] = []
     pts: List[Tuple[float, float]] = []
-    for t in ordered:
-        cx = t.centroid[0]
-        cy = min(1.0, max(0.0, float(np.polyval(coef, cx)) - lift))
+
+    for i in range(count):
+        cx = x_min if count == 1 else x_min + span * i / (count - 1)
+        anchor = min(ordered, key=lambda t: abs(t.centroid[0] - cx))
+        curve_y = float(np.polyval(coef, cx)) + direction * lift
+        # Jaga bracket di badan mahkota gigi jangkar, jangan sampai ke gusi atau bibir.
+        h_anchor = anchor.box[3] - anchor.box[1]
+        top = anchor.box[1] + 0.28 * h_anchor
+        bottom = anchor.box[3] - 0.28 * h_anchor
+        cy = min(1.0, max(0.0, min(bottom, max(top, curve_y))))
         slope = 2 * coef[0] * cx + coef[1]
         angle = max(-ANGLE_LIMIT, min(ANGLE_LIMIT, math.degrees(math.atan(slope))))
         pts.append((cx, cy))
         brackets.append(Bracket(
-            tooth=t.index,
+            tooth=anchor.index,
             center=[round(cx, 4), round(cy, 4)],
             angle=round(angle, 1),
             width=round(size, 4),
             height=round(height, 4),
+            jaw=label,
         ))
     return brackets, _catmull_rom_path(_catmull_rom_points(pts))
 
@@ -118,6 +160,7 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
     archwires: List[str] = []
     notes: List[JawNote] = []
     for jaw, label in zip(jaws, labels):
+        jaw = _dedupe(jaw)
         if len(jaw) < JAW_MIN_TEETH:
             if label != "gigi":
                 notes.append(JawNote(
@@ -125,7 +168,7 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
                     message=f"Rahang {label} kurang jelas, coba foto gigi tampak depan.",
                 ))
             continue
-        jaw_brackets, wire = _snap_to_curve(jaw)
+        jaw_brackets, wire = _snap_to_curve(jaw, label)
         brackets.extend(jaw_brackets)
         archwires.append(wire)
     return Overlay(

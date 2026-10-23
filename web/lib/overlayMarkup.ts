@@ -1,5 +1,5 @@
 import { MASK_FILL, MASK_STROKE, WIRE_COLOR, overlayStyleFor } from "./overlayStyle";
-import type { BracesType, Overlay as OverlayT } from "./types";
+import type { BracesType, Overlay as OverlayT, Tooth as ToothT } from "./types";
 
 /**
  * Sumber tunggal gambaran overlay: string SVG dalam koordinat piksel gambar.
@@ -36,20 +36,38 @@ export function scalePath(path: string, w: number, h: number): string {
   return out;
 }
 
-/** Poligon mask gigi dikembang ringan (12%) agar tepi bracket masih terlihat. */
-function inflatePolygon(points: [number, number][], factor = 1.12): string {
-  const cx = points.reduce((s, p) => s + p[0], 0) / points.length;
-  const cy = points.reduce((s, p) => s + p[1], 0) / points.length;
-  return points
-    .map(([x, y]) => `${(cx + (x - cx) * factor).toFixed(4)},${(cy + (y - cy) * factor).toFixed(4)}`)
-    .join(" ");
+/**
+ * Pita (ribbon) sepanjang satu rahang, dalam koordinat piksel.
+ *
+ * Clip per gigi memotong bracket yang jatuh di celah antar gigi, sedangkan
+ * clip berupa gabungan poligon gigi masih menyisakan celah yang sama. Pita ini
+ * dibentuk dari batas atas dan bawah kotak gigi se-rahang lalu disambung
+ * lurus, jadi tetap mengikuti bentuk rahang tanpa meluber ke bibir atau gusi.
+ */
+function jawBandPolygon(teeth: ToothT[], w: number, h: number): string {
+  const sorted = [...teeth].sort((a, b) => a.box[0] - b.box[0]);
+  if (sorted.length === 0) return "";
+  const pad = 0.012 * h;
+  const top = sorted.map((t) => [((t.box[0] + t.box[2]) / 2) * w, t.box[1] * h - pad] as const);
+  const bottom = sorted.map((t) => [((t.box[0] + t.box[2]) / 2) * w, t.box[3] * h + pad] as const);
+  // Pita dimulai dan diakhiri di tepi luar gigi terluar supaya bracket paling
+  // kiri/kanan tidak terbelah, lalu disambung lurus melewati celah antar gigi.
+  const firstTop = [sorted[0].box[0] * w, top[0][1]] as const;
+  const lastTop = [sorted[sorted.length - 1].box[2] * w, top[top.length - 1][1]] as const;
+  const firstBottom = [sorted[0].box[0] * w, bottom[0][1]] as const;
+  const lastBottom = [sorted[sorted.length - 1].box[2] * w, bottom[bottom.length - 1][1]] as const;
+  const upper = [firstTop, ...top, lastTop].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`);
+  const lower = [lastBottom, ...[...bottom].reverse(), firstBottom].map(
+    ([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`
+  );
+  return [...upper, ...lower].join(" ");
 }
 
 function polygonAbsolute(points: [number, number][], w: number, h: number): string {
   return points.map(([x, y]) => `${x * w},${y * h}`).join(" ");
 }
 
-function defsFor(type: Exclude<BracesType, "clear">): string {
+function defsFor(type: Exclude<BracesType, "clear">, clips: { id: string; points: string }[]): string {
   const g = GRADIENTS[type];
   return (
     `<defs>` +
@@ -61,6 +79,9 @@ function defsFor(type: Exclude<BracesType, "clear">): string {
     `<filter id="saShadow" x="-60%" y="-60%" width="220%" height="220%">` +
     `<feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#182226" flood-opacity="0.35"/>` +
     `</filter>` +
+    clips
+      .map((c) => `<clipPath id="${c.id}" clipPathUnits="userSpaceOnUse">${c.points}</clipPath>`)
+      .join("") +
     `</defs>`
   );
 }
@@ -100,8 +121,25 @@ export function buildOverlayMarkup(
 
   if (style.showBrackets) {
     const grad = GRADIENTS[opts.type as Exclude<BracesType, "clear">];
-    parts.push(defsFor(opts.type as Exclude<BracesType, "clear">));
     const toothById = new Map(overlay.teeth.map((t) => [t.index, t]));
+    const clips: { id: string; points: string }[] = [];
+    const groups: string[] = [];
+
+    // Satu clip per rahang berisi gabungan semua giginya. Clip per gigi
+    // memotong bracket yang duduk di tepi mahkota, sedangkan gabungan rahang
+    // tetap mencegah bracket keluar ke bibir atau gusi.
+    const teethByJaw = new Map<string, typeof overlay.teeth>();
+    for (const b of overlay.brackets) {
+      const tooth = toothById.get(b.tooth);
+      if (!tooth) continue;
+      const list = teethByJaw.get(b.jaw) ?? [];
+      if (!list.includes(tooth)) list.push(tooth);
+      teethByJaw.set(b.jaw, list);
+    }
+    for (const [jaw, teeth] of teethByJaw) {
+      clips.push({ id: `saClip-${jaw}`, points: `<polygon points="${jawBandPolygon(teeth, w, h)}"/>` });
+    }
+
     for (const b of overlay.brackets) {
       const tooth = toothById.get(b.tooth);
       if (!tooth) continue;
@@ -109,19 +147,18 @@ export function buildOverlayMarkup(
       const cy = b.center[1] * h;
       const bw = b.width * w;
       const bh = b.height * h;
-      const clip = `clip-${b.tooth}`;
-      parts.push(
-        `<clipPath id="${clip}" clipPathUnits="objectBoundingBox"><polygon points="${inflatePolygon(tooth.polygon)}"/></clipPath>` +
-        `<g transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)}) rotate(${b.angle})" clip-path="url(#${clip})">` +
-        `<rect x="${-bw / 2}" y="${-bh / 2}" width="${bw}" height="${bh}" rx="${bw * 0.26}" fill="url(#${grad.id})" stroke="${grad.stroke}" stroke-width="${Math.max(1, w * 0.0015)}" filter="url(#saShadow)"/>` +
-        `<rect x="${-bw * 0.34}" y="${-bh * 0.14}" width="${bw * 0.68}" height="${bh * 0.28}" rx="${bh * 0.12}" fill="${grad.slot}" opacity="0.9"/>` +
-        (style.tie
-          ? `<rect x="${-bw * 0.26}" y="${-bh * 0.1}" width="${bw * 0.52}" height="${bh * 0.2}" rx="${bh * 0.1}" fill="${style.tie}" opacity="0.95"/>`
-          : "") +
-        `<ellipse cx="${-bw * 0.2}" cy="${-bh * 0.3}" rx="${bw * 0.16}" ry="${bh * 0.1}" fill="#ffffff" opacity="0.6"/>` +
-        `</g>`
+      groups.push(
+        `<g clip-path="url(#saClip-${b.jaw})"><g transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)}) rotate(${b.angle})">` +
+          `<rect x="${-bw / 2}" y="${-bh / 2}" width="${bw}" height="${bh}" rx="${bw * 0.26}" fill="url(#${grad.id})" stroke="${grad.stroke}" stroke-width="${Math.max(1, w * 0.0015)}" filter="url(#saShadow)"/>` +
+          `<rect x="${-bw * 0.34}" y="${-bh * 0.14}" width="${bw * 0.68}" height="${bh * 0.28}" rx="${bh * 0.12}" fill="${grad.slot}" opacity="0.9"/>` +
+          (style.tie
+            ? `<rect x="${-bw * 0.26}" y="${-bh * 0.1}" width="${bw * 0.52}" height="${bh * 0.2}" rx="${bh * 0.1}" fill="${style.tie}" opacity="0.95"/>`
+            : "") +
+          `<ellipse cx="${-bw * 0.2}" cy="${-bh * 0.3}" rx="${bw * 0.16}" ry="${bh * 0.1}" fill="#ffffff" opacity="0.6"/>` +
+          `</g></g>`
       );
     }
+    parts.push(defsFor(opts.type as Exclude<BracesType, "clear">, clips), ...groups);
   }
 
   return parts.join("");

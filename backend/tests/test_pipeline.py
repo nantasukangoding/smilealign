@@ -73,12 +73,44 @@ def test_two_jaws_two_wires_snapped_to_curve():
     assert len(overlay.archwires) == 2
     assert len(overlay.brackets) == 16
     widths = {round(b.width, 4) for b in overlay.brackets}
-    assert len(widths) == 1  # ukuran seragam per kegunaan mediana
-    centers = sorted({b.center[0] for b in overlay.brackets})
-    assert len(centers) == len({t.centroid[0] for t in teeth})  # tetap di gigi asal
+    assert len(widths) == 1  # ukuran seragam dari lebar gigi mediana
+    for jaw in ("atas", "bawah"):
+        xs = sorted(b.center[0] for b in overlay.brackets if b.jaw == jaw)
+        gaps = [round(xs[i + 1] - xs[i], 4) for i in range(len(xs) - 1)]
+        assert max(gaps) - min(gaps) < 0.01  # jarak antar bracket merata
     for b in overlay.brackets:
         assert 0 < b.center[1] < 0.7
         assert -30 <= b.angle <= 30
+
+
+def test_crowded_teeth_still_evenly_spaced():
+    """Gigi berdesakan tidak boleh membuat bracket menumpuk."""
+    from app.schemas import Tooth
+
+    teeth = []
+    for i in range(7):  # rahang atas renggang
+        cx = 0.1 + i * 0.11
+        teeth.append(Tooth(index=i, polygon=[[cx, 0.4]] * 8, centroid=[cx, 0.4],
+                           box=[cx - 0.03, 0.36, cx + 0.03, 0.44], angle=0))
+    for i in range(7):  # rahang bawah berdesakan di kiri, ada celah di kanan
+        cx = 0.12 + (i * 0.03 if i < 4 else 0.12 + (i - 4) * 0.16)
+        teeth.append(Tooth(index=7 + i, polygon=[[cx, 0.62]] * 8, centroid=[cx, 0.62],
+                           box=[cx - 0.02, 0.58, cx + 0.02, 0.66], angle=0))
+
+    overlay = build_overlay(teeth)
+    lower = sorted(b.center[0] for b in overlay.brackets if b.jaw == "bawah")
+    assert len(lower) == 7
+    gaps = [round(lower[i + 1] - lower[i], 4) for i in range(len(lower) - 1)]
+    assert max(gaps) - min(gaps) < 0.01
+
+
+def test_duplicate_detection_collapses():
+    """Dua mask untuk satu gigi hanya menghasilkan satu bracket."""
+    teeth = _make_teeth(upper=8, lower=8)
+    clone = teeth[0].model_copy(update={"index": 99, "centroid": [teeth[0].centroid[0] + 0.001, teeth[0].centroid[1] + 0.001]})
+    overlay = build_overlay(teeth + [clone])
+    upper = [b for b in overlay.brackets if b.jaw == "atas"]
+    assert len(upper) == 8
 
 
 def test_small_jaw_withheld_with_note():

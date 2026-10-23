@@ -37,31 +37,59 @@ def images_dir(root: Path, split: str) -> Path | None:
     return None
 
 
-def copy_split(src_root: Path, split: str, dst: Path, prefix: str) -> int:
+def normalize_row(line: str) -> str | None:
+    """Samakan baris label ke format segmentasi (polygon), kelas selalu 0.
+
+    AlphaDent mencampur baris polygon (>= 3 titik) dan baris bbox (cx cy w h).
+    Ultralytics menolak file yang mencampur keduanya, jadi bbox diubah menjadi
+    polygon persegi empat titik. Baris yang tidak dikenali dibuang.
+    """
+    parts = line.split()
+    if len(parts) < 2:
+        return None
+    coords = parts[1:]
+    if len(coords) == 4:  # bbox: cx cy w h -> 4 sudut
+        cx, cy, bw, bh = (float(v) for v in coords)
+        x1, y1 = cx - bw / 2, cy - bh / 2
+        x2, y2 = cx + bw / 2, cy + bh / 2
+        corners = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+        return "0 " + " ".join(f"{v:.6f}" for pt in corners for v in pt)
+    if len(coords) >= 6 and len(coords) % 2 == 0:  # polygon
+        return "0 " + " ".join(coords)
+    return None
+
+
+def copy_split(src_root: Path, split: str, dst: Path, prefix: str) -> tuple[int, int]:
     imgs = images_dir(src_root, split)
     lbls = labels_dir(src_root, split)
     if imgs is None or lbls is None:
-        return 0
+        return 0, 0
     n = 0
+    dropped = 0
     for img in sorted(imgs.iterdir()):
         if img.suffix.lower() not in (".jpg", ".jpeg", ".png"):
             continue
         lbl = lbls / (img.stem + ".txt")
         if not lbl.exists():
             continue
-        img_new = dst / "images" / f"{prefix}{img.name}"
-        lbl_new = dst / "labels" / f"{prefix}{img.stem}.txt"
-        shutil.copy(img, img_new)
-        lines = []
+        rows = []
         for line in lbl.read_text(encoding="utf-8").splitlines():
             t = line.strip()
             if not t:
                 continue
-            parts = t.split()
-            lines.append("0 " + " ".join(parts[1:]))  # semua kelas -> 0 (tooth)
-        lbl_new.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            row = normalize_row(t)
+            if row is None:
+                dropped += 1
+                continue
+            rows.append(row)
+        if not rows:
+            continue
+        shutil.copy(img, dst / "images" / f"{prefix}{img.name}")
+        (dst / "labels" / f"{prefix}{img.stem}.txt").write_text(
+            "\n".join(rows) + "\n", encoding="utf-8"
+        )
         n += 1
-    return n
+    return n, dropped
 
 
 def main() -> None:
@@ -72,6 +100,7 @@ def main() -> None:
     args = ap.parse_args()
 
     total = {"train": 0, "valid": 0}
+    dropped = 0
     jobs = [
         ("intraoral", args.intraoral, [("train", "train"), ("valid", "valid"), ("test", "valid")]),
         ("alphadent", args.alphadent, [("train", "train"), ("valid", "valid"), ("test", "valid")]),
@@ -81,13 +110,17 @@ def main() -> None:
         for split_src, split_dst in splits:
             for sub in ("images", "labels"):
                 (args.out / split_dst / sub).mkdir(parents=True, exist_ok=True)
-            total[split_dst] += copy_split(src_root, split_src, args.out / split_dst, prefix)
+            n, d = copy_split(src_root, split_src, args.out / split_dst, prefix)
+            total[split_dst] += n
+            dropped += d
 
     (args.out / "data.yaml").write_text(
         "train: train/images\nval: valid/images\nnc: 1\nnames: ['tooth']\n",
         encoding="utf-8",
     )
     print(f"Selesai. train={total['train']} gambar, valid={total['valid']} gambar -> {args.out}")
+    if dropped:
+        print(f"Catatan: {dropped} baris label dibuang karena formatnya tidak dikenali.")
 
 
 if __name__ == "__main__":
