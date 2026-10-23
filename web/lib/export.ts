@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
-import { buildOverlayMarkup } from "./overlayMarkup";
-import type { AnalyzeResponse, BracesType } from "./types";
+import { SEVERITY_LABEL } from "./overlayStyle";
+import type { AnalyzeResponse } from "./types";
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -11,73 +11,21 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-function buildOverlaySvgMarkup(
-  result: AnalyzeResponse,
-  type: BracesType,
-  rubberHex: string,
-  showMask: boolean
-): string {
-  const { width: w, height: h } = result.processed;
-  const inner = buildOverlayMarkup(result.overlay, w, h, { type, rubberHex, showMask });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`;
-}
-
-function svgToImage(markup: string): Promise<HTMLImageElement> {
-  const blob = new Blob([markup], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  return loadImage(url).finally(() => URL.revokeObjectURL(url));
-}
-
-/** Ekspor PNG: foto asli + overlay, digambar ke canvas ukuran gambar hasil analisis. */
-export async function exportCompositePng(
-  photoUrl: string,
-  result: AnalyzeResponse,
-  type: BracesType,
-  rubberHex: string,
-  showMask: boolean,
-  filename: string
-): Promise<void> {
-  const [photo, svgImg] = await Promise.all([
-    loadImage(photoUrl),
-    svgToImage(buildOverlaySvgMarkup(result, type, rubberHex, showMask)),
-  ]);
-  const { width, height } = result.processed;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas tidak tersedia di browser ini.");
-  ctx.drawImage(photo, 0, 0, width, height);
-  ctx.drawImage(svgImg, 0, 0, width, height);
-  await triggerDownload(canvas.toDataURL("image/png"), filename);
-}
-
-async function triggerDownload(dataUrl: string, filename: string) {
-  const a = document.createElement("a");
-  a.href = dataUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
 function wrapText(doc: jsPDF, text: string, maxWidth: number): string[] {
   return doc.splitTextToSize(text, maxWidth) as unknown as string[];
 }
 
-/** Laporan PDF satu halaman: foto + overlay, daftar temuan, rekomendasi, disclaimer. */
+/**
+ * Laporan PDF satu halaman untuk dibawa ke klinik: foto asli, daftar temuan,
+ * rekomendasi. Tanpa overlay behel, karena berkas ini dipakai sebagai catatan
+ * pemeriksaan, bukan sebagai gambar simulasi.
+ */
 export async function exportSummaryPdf(
   photoUrl: string,
   result: AnalyzeResponse,
-  type: BracesType,
-  rubberHex: string,
-  showMask: boolean,
   filename: string
 ): Promise<void> {
-  const [photo, svgImg] = await Promise.all([
-    loadImage(photoUrl),
-    svgToImage(buildOverlaySvgMarkup(result, type, rubberHex, showMask)),
-  ]);
+  const photo = await loadImage(photoUrl);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -86,38 +34,61 @@ export async function exportSummaryPdf(
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text("Laporan Simulasi Behel SmileAlign", margin, 18);
+  doc.text("Laporan Analisis Gigi SmileAlign", margin, 18);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text("Perkiraan untuk edukasi, berbasis foto. Bukan diagnosis medis.", margin, 24);
   doc.setTextColor(30);
-  doc.setFontSize(10);
 
+  // Foto dibatasi pada kotak, bukan dilebarkan sampai selebar halaman.
+  // Tanpa batas tinggi, foto potret mendorong teks ke halaman kedua.
   const { width, height } = result.processed;
-  const imgW = contentW;
-  const imgH = (height / width) * imgW;
-  const composite = document.createElement("canvas");
-  composite.width = width;
-  composite.height = height;
-  const ctx = composite.getContext("2d");
+  const boxW = contentW;
+  const boxH = 118;
+  const scale = Math.min(boxW / width, boxH / height);
+  const imgW = width * scale;
+  const imgH = height * scale;
+  const imgX = margin + (boxW - imgW) / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas tidak tersedia di browser ini.");
   ctx.drawImage(photo, 0, 0, width, height);
-  ctx.drawImage(svgImg, 0, 0, width, height);
 
-  doc.addImage(composite.toDataURL("image/jpeg", 0.9), "JPEG", margin, 30, imgW, imgH);
+  doc.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", imgX, 30, imgW, imgH);
 
   let y = 30 + imgH + 8;
   doc.setFont("helvetica", "bold");
-  doc.text(
-    `Keparahan keseluruhan: ${result.overall_severity.toUpperCase()}`,
-    margin,
-    y
-  );
-  y += 7;
+  doc.setFontSize(10);
+  // Saat foto kurang terbaca tidak ada penilaian posisi, jadi keparahan tidak
+  // dicetak. Menulis "ringan" di situ akan terbaca sebagai hasil yang sah.
+  if (!result.insufficient) {
+    doc.text(
+      `Keparahan keseluruhan: ${(SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity).toUpperCase()}`,
+      margin,
+      y
+    );
+    y += 7;
+  }
   doc.setFont("helvetica", "normal");
-  if (result.problems.length === 0) {
-    y = drawLines(doc, ["Tidak ada indikasi masalah posisi dari pengukuran geometris."], margin, y, contentW);
+  if (result.insufficient) {
+    y = drawLines(
+      doc,
+      ["Foto belum terbaca cukup. Posisi gigi belum dinilai, jadi laporan ini hanya memuat tips foto ulang."],
+      margin,
+      y,
+      contentW
+    );
+  } else if (result.problems.length === 0) {
+    y = drawLines(
+      doc,
+      ["Tidak ada indikasi masalah posisi dari pengukuran geometris."],
+      margin,
+      y,
+      contentW
+    );
   }
   for (const p of result.problems) {
     const line = `- ${p.label} (keparahan: ${p.severity}, keyakinan: ${Math.round(

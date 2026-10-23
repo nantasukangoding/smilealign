@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { BeforeAfter } from "./BeforeAfter";
 import { Button, Card, Modal, SeverityBadge } from "./ui";
-import { AlertIcon, CheckIcon, CopyIcon, DownloadIcon, DocIcon, RetryIcon } from "./icons";
+import { AlertIcon, CheckIcon, CopyIcon, DocIcon, RetryIcon } from "./icons";
 import { BRACES_OPTIONS, RUBBER_COLORS, SEVERITY_LABEL } from "@/lib/overlayStyle";
 import type { AnalyzeResponse, BracesType, RubberColor } from "@/lib/types";
 
-const FILE_BASE = "smilealign-simulasi";
+const FILE_NAME = "smilealign-laporan.pdf";
 
 function toRoman(n: number): string {
   return String(n + 1);
@@ -28,42 +28,17 @@ export function ResultView({
   const [consultOpen, setConsultOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exportError, setExportError] = useState("");
-  const svgRef = useRef<SVGSVGElement | null>(null);
   const isMock = result.processed.mode === "mock";
 
-  const summaryText = useMemo(() => buildSummary(result, type), [result, type]);
-
-  async function exportPng() {
-    setExportError("");
-    try {
-      const { exportCompositePng } = await import("@/lib/export");
-      await exportCompositePng(
-        photoUrl,
-        result,
-        type,
-        rubber.hex,
-        showMask,
-        `${FILE_BASE}.png`
-      );
-    } catch {
-      setExportError("Unduh PNG gagal. Coba lagi, atau pakai Unduh laporan (PDF).");
-    }
-  }
+  const summaryText = useMemo(() => buildSummary(result), [result]);
 
   async function exportPdf() {
     setExportError("");
     try {
       const { exportSummaryPdf } = await import("@/lib/export");
-      await exportSummaryPdf(
-        photoUrl,
-        result,
-        type,
-        rubber.hex,
-        showMask,
-        `${FILE_BASE}.pdf`
-      );
+      await exportSummaryPdf(photoUrl, result, FILE_NAME);
     } catch {
-      setExportError("Unduh PDF gagal. Coba lagi, atau pakai Unduh simulasi (PNG).");
+      setExportError("Unduh laporan gagal. Coba lagi sebentar lagi.");
     }
   }
 
@@ -125,7 +100,6 @@ export function ResultView({
           type={type}
           rubberHex={rubber.hex}
           showMask={showMask}
-          svgRef={svgRef}
           insufficient={result.insufficient ?? false}
         />
 
@@ -284,10 +258,6 @@ export function ResultView({
           </>
         )}
         <div className={`flex flex-wrap gap-3 ${result.insufficient ? "mt-1" : ""}`}>
-          <Button onClick={exportPng} variant="secondary">
-            <DownloadIcon className="h-5 w-5" />
-            Unduh simulasi (PNG)
-          </Button>
           <Button onClick={exportPdf} variant="secondary">
             <DocIcon className="h-5 w-5" />
             Unduh laporan (PDF)
@@ -346,8 +316,7 @@ function ConfidencePill({ value }: { value: number }) {
   );
 }
 
-function buildSummary(result: AnalyzeResponse, type: BracesType): string {
-  const jenis = BRACES_OPTIONS.find((o) => o.id === type)?.label ?? type;
+function buildSummary(result: AnalyzeResponse): string {
   const lines = ["Ringkasan SmileAlign (perkiraan untuk edukasi, bukan diagnosis)"];
   if (result.insufficient) {
     lines.push("Foto belum terbaca cukup (lengkung gigi tidak lengkap). Posisi gigi belum dinilai.");
@@ -369,7 +338,6 @@ function buildSummary(result: AnalyzeResponse, type: BracesType): string {
         `, keparahan ${p.severity}, keyakinan ${Math.round(p.confidence * 100)}%`
     );
   }
-  lines.push(`Jenis behel pada simulasi: ${jenis.toLowerCase()}.`);
   lines.push("Bawa ringkasan ini saat konsultasi ke dokter gigi ortodontik.");
   return lines.join("\n");
 }

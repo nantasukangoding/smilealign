@@ -2,7 +2,8 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.analysis.braces import build_overlay
-from app.analysis.rules import PHOTO_TIPS, arch_coverage_ok, detect_problems, recommend
+from app.analysis.rules import (PHOTO_TIPS, arch_coverage_ok, detect_problems,
+                                overall_severity, recommend)
 from app.image_utils import ImageError, MAX_UPLOAD_BYTES, load_and_prepare
 from app.segmentation import run_segmentation
 from app.schemas import AnalyzeResponse, Overlay
@@ -26,14 +27,14 @@ async def analyze(file: UploadFile = File(...)):
 
     overlay: Overlay = build_overlay(teeth)
     insufficient = not arch_coverage_ok(teeth)
+    problems = [] if insufficient else detect_problems(teeth)
     return AnalyzeResponse(
         processed=dict(width=img.width, height=img.height, exif_rotated=exif_rotated,
                        mode=mode),
         overlay=overlay,
-        problems=[] if insufficient else detect_problems(teeth),
-        overall_severity="ringan",
-        recommendations=list(PHOTO_TIPS) if insufficient else recommend(
-            detect_problems(teeth)),
+        problems=problems,
+        overall_severity=overall_severity(problems),
+        recommendations=list(PHOTO_TIPS) if insufficient else recommend(problems),
         insufficient=insufficient,
         mock=(mode == "mock"),
     )

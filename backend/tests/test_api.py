@@ -48,6 +48,19 @@ def test_api_analyze_rejects_bogus():
     assert "JPG atau PNG" in res.json()["detail"]
 
 
+def test_overall_severity_matches_heaviest_problem():
+    from app.analysis.rules import overall_severity
+    from app.schemas import Problem
+
+    def p(key, severity):
+        return Problem(key=key, label=key, severity=severity, confidence=0.9, affected=[])
+
+    assert overall_severity([]) == "ringan"
+    assert overall_severity([p("crowding", "ringan")]) == "ringan"
+    assert overall_severity([p("crowding", "ringan"), p("spacing", "berat")]) == "berat"
+    assert overall_severity([p("rotation", "sedang"), p("tilt", "ringan")]) == "sedang"
+
+
 def test_health():
     client = TestClient(app)
     res = client.get("/api/health")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type RefObject } from "react";
+import { useCallback, useRef, useState } from "react";
 import { OverlaySvg } from "./OverlaySvg";
 import type { AnalyzeResponse, BracesType } from "@/lib/types";
 
@@ -15,7 +15,6 @@ export function BeforeAfter({
   type,
   rubberHex,
   showMask,
-  svgRef,
   insufficient = false,
 }: {
   photoUrl: string;
@@ -23,7 +22,6 @@ export function BeforeAfter({
   type: BracesType;
   rubberHex: string;
   showMask: boolean;
-  svgRef: RefObject<SVGSVGElement | null>;
   insufficient?: boolean;
 }) {
   const [pos, setPos] = useState(55);
@@ -72,7 +70,6 @@ export function BeforeAfter({
         />
         {!insufficient && (
           <OverlaySvg
-            ref={svgRef}
             overlay={result.overlay}
             dims={dims}
             type={type}

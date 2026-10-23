@@ -83,6 +83,11 @@ def _overall(problems: List[Problem]) -> str:
     return max(problems, key=lambda p: SEVERITY_RANK[p.severity]).severity
 
 
+def overall_severity(problems: List[Problem]) -> str:
+    """Keparahan gabungan: yang terberat di antara semua temuan."""
+    return _overall(problems)
+
+
 def arch_coverage_ok(teeth: List[Tooth]) -> bool:
     """Gate kualitas: bila False, hasil aturan tidak sah (kembalikan tips foto saja)."""
     if len(teeth) < MIN_TEETH_FOR_RULES:
