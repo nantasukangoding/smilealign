@@ -90,7 +90,7 @@ export function HomeView() {
       <canvas ref={canvasRef} className={s.fx} aria-hidden />
 
       <header className={s.nav} ref={navRef}>
-        <div className={`${s.wrap} ${s.navInner}`}>
+        <div className={`${s.wrap} ${s.navBar} ${s.navInner}`}>
           <Wordmark className={s.logo} />
           <nav className={s.navLinks} aria-label="Navigasi utama">
             <a href="#cara-kerja">Cara kerja</a>
@@ -173,7 +173,7 @@ export function HomeView() {
 
         <section className={s.story} id="cara-kerja" ref={storyRef}>
           <div className={`${s.wrap} ${s.sticky}`}>
-            <div>
+            <div className={s.storyText}>
               <h2>Cara kerja</h2>
               <div className={s.cards}>
                 {STEPS.map((step, i) => (

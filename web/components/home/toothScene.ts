@@ -379,12 +379,18 @@ export function createToothScene(opts: ToothSceneOptions): ToothSceneHandle | nu
     const targetY =
       lerp(heroRect.top + heroRect.height / 2, slotCenterY, handover) +
       (1 - pop) * heroRect.height * 0.25 * (1 - handover);
+    // Batas atas ukuran model: tanpa ini, panggung yang lebar di layar
+    // ultrawide membuat model membengkak melebihi porsi teksnya.
+    const MAX_MODEL = 560;
     const targetScale = reduceMotion
       ? Math.min(heroRect.width, heroRect.height * 1.3) * 0.7
-      : lerp(
-          Math.min(heroRect.width * 0.78, heroRect.height * 1.7) * pop,
-          Math.min(storyRect.width, storyRect.height * 1.3) * 0.7,
-          handover,
+      : Math.min(
+          MAX_MODEL,
+          lerp(
+            Math.min(heroRect.width * 0.78, heroRect.height * 1.7) * pop,
+            Math.min(storyRect.width, storyRect.height * 1.3) * 0.7,
+            handover,
+          ),
         );
 
     const rotateProgress = storyProgress;

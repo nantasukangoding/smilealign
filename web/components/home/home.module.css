@@ -16,10 +16,12 @@
 }
 
 /* Konten rata kiri, bukan di tengah: judul dan isi mulai dari tepi kiri
-   supaya tidak menyisakan margin besar di layar lebar. */
+   supaya tidak menyisakan margin besar di layar lebar. Lebar isi dibatasi
+   per elemen (paragraf dan kartu), bukan oleh wadah, jadi di layar ultrawide
+   tidak ada sisa ruang menganggur di kanan. */
 .wrap {
   width: 100%;
-  max-width: 1600px;
+  max-width: none;
   margin: 0;
   padding-left: clamp(1.25rem, 4vw, 4.5rem);
   padding-right: clamp(1.25rem, 4vw, 4.5rem);
@@ -35,12 +37,29 @@
   border-bottom: 1px solid var(--color-line);
 }
 
+/* Bilah navigasi selebar layar, terpisah dari kontainer isi yang dibatasi
+   1600px. Tanpa ini, di layar lebar tombol kanan berhenti di tengah. */
+.navBar {
+  max-width: none;
+  margin: 0;
+}
+
+/* Tiga kolom 1fr auto 1fr: link benar-benar di tengah layar, tombol menempel
+   di tepi kanan, berapa pun lebar logo. */
 .navInner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
   height: 4rem;
+}
+
+.navLinks {
+  justify-self: center;
+}
+
+.navCta {
+  justify-self: end;
 }
 
 .logo {
@@ -117,8 +136,11 @@
   position: sticky;
   top: 4rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: 4vw;
+  /* Kolom teks berhenti di lebar baca yang nyaman, panggung mengambil sisa
+     ruang dengan batas atas sendiri. Kalau keduanya memakai fr, di layar
+     ultrawide jarak antar kolom melebar jadi lubang kosong. */
+  grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
   align-items: center;
   height: calc(100vh - 4rem);
   padding-top: 0;
@@ -129,6 +151,12 @@
   .hero {
     height: calc(100svh - 4rem);
   }
+}
+
+.heroText {
+  /* Batas lebar supaya judul tetap 3 sampai 4 baris di layar ultrawide,
+     tidak melebar jadi satu baris panjang. */
+  max-width: 38rem;
 }
 
 .heroText h1 {
@@ -180,6 +208,11 @@
   position: relative;
   height: min(68vh, 580px);
   min-height: 360px;
+  /* Panggung ditempel ke tepi kanan dan lebarnya dibatasi. Tanpa batas ini,
+     di layar ultrawide kolom grid melebar dan model ikut membengkak. */
+  width: 100%;
+  max-width: 860px;
+  justify-self: end;
 }
 
 /* Kanvas menutupi layar; posisi model diatur lewat transform tiap frame. */
@@ -255,8 +288,8 @@
   position: sticky;
   top: 4rem;
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 4vw;
+  grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
   align-items: center;
   height: calc(100vh - 4rem);
 }
@@ -274,6 +307,12 @@
   line-height: 1.15;
   letter-spacing: -0.01em;
   margin: 0;
+}
+
+.storyText {
+  /* Sama seperti judul hero: kolom teks dibatasi supaya tidak melebar di
+     layar sangat lebar. */
+  max-width: 32rem;
 }
 
 /* Kartu ditumpuk dengan grid, bukan absolute, supaya tinggi wadah otomatis
@@ -344,6 +383,10 @@
   position: relative;
   height: 100%;
   min-height: 340px;
+  /* Sama seperti panggung hero: ditempel ke kanan dan lebarnya dibatasi. */
+  width: 100%;
+  max-width: 860px;
+  justify-self: end;
 }
 
 /* ---------- blok isi ---------- */
@@ -377,8 +420,10 @@
 
 .privacy {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4vw;
+  /* Dua kolom dengan lebar baca terbatas, bukan 1fr 1fr: di layar lebar
+     1fr 1fr membuat butir daftar melebar sampai sulit dibaca. */
+  grid-template-columns: minmax(0, 30rem) minmax(0, 34rem);
+  gap: clamp(1.5rem, 4vw, 4rem);
   align-items: center;
 }
 
@@ -408,7 +453,7 @@
 }
 
 .faq {
-  max-width: 760px;
+  max-width: 46rem;
   margin: 2rem 0 0;
 }
 
@@ -464,12 +509,10 @@
   text-underline-offset: 2px;
 }
 
-.end {
-  text-align: center;
-}
-
+/* Rata kiri seperti bagian lain. Versi tengah membuat halaman terasa
+   berpindah sumbu di bagian penutup. */
 .end .lead {
-  margin: 0.8rem auto 1.6rem;
+  margin: 0.8rem 0 1.6rem;
 }
 
 .footer {
@@ -502,6 +545,12 @@
     display: none;
   }
 
+  /* Dua kolom saja saat link disembunyikan, supaya tombol tidak pindah ke
+     kolom tengah. */
+  .navInner {
+    grid-template-columns: 1fr auto;
+  }
+
   .wrap {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
@@ -526,6 +575,8 @@
     order: -1;
     height: min(30vh, 240px);
     min-height: 160px;
+    max-width: none;
+    justify-self: stretch;
   }
 
   .hero {
@@ -553,6 +604,8 @@
     height: auto;
     min-height: 0;
     align-self: stretch;
+    max-width: none;
+    justify-self: stretch;
   }
 
   .sticky h2 {
