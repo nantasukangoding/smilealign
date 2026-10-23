@@ -156,15 +156,15 @@
 .heroText {
   /* Batas lebar supaya judul tetap 3 sampai 4 baris di layar ultrawide,
      tidak melebar jadi satu baris panjang. */
-  max-width: 38rem;
+  max-width: 42rem;
 }
 
 .heroText h1 {
   font-family: var(--font-display);
-  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  font-size: clamp(2.9rem, 7vw, 5.4rem);
   font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
@@ -584,7 +584,7 @@
   }
 
   .heroText h1 {
-    font-size: clamp(2rem, 8.6vw, 2.7rem);
+    font-size: clamp(2.2rem, 9.4vw, 3rem);
   }
 
   .sub {
@@ -650,7 +650,7 @@
   }
 
   .heroText h1 {
-    font-size: 1.7rem;
+    font-size: 1.85rem;
   }
 
   .cards {
