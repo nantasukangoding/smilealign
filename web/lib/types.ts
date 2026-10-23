@@ -6,6 +6,7 @@ export interface Tooth {
   centroid: [number, number];
   box: [number, number, number, number];
   angle: number;
+  confidence: number;
 }
 
 export interface Bracket {

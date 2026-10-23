@@ -62,5 +62,6 @@ def mock_segmentation(img: Image) -> List[Tooth]:
             centroid=[round(x, 4), round(y, 4)],
             box=[round(x1, 4), round(y1, 4), round(x2, 4), round(y2, 4)],
             angle=round(_pca_angle(pts), 1),
+            confidence=0.86,
         ))
     return teeth

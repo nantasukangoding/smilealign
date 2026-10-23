@@ -11,6 +11,7 @@ class Tooth(BaseModel):
     centroid: List[float]
     box: List[float] = Field(..., description="[x1, y1, x2, y2] normalisasi")
     angle: float = Field(..., description="sudut poros utama gigi dalam derajat")
+    confidence: float = Field(1.0, description="keyakinan model terhadap deteksi gigi ini")
 
 
 class Bracket(BaseModel):

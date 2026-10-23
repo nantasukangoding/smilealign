@@ -20,14 +20,15 @@ def segment_with_yolo(img: Image, weights_path: Path) -> List[Tooth]:
         raise RuntimeError("paket ultralytics belum terpasang di backend") from exc
 
     model = YOLO(str(weights_path))
-    results = model.predict(img, conf=0.25, imgsz=1024, verbose=False)
+    results = model.predict(img, conf=0.25, imgsz=960, verbose=False)
     if not results or results[0].masks is None:
         return []
 
     w, h = img.size
     masks = results[0].masks.xy
+    scores = results[0].boxes.conf
     teeth: List[Tooth] = []
-    for i, mask_xy in enumerate(masks):
+    for i, (mask_xy, score) in enumerate(zip(masks, scores)):
         pts = np.asarray(mask_xy, dtype=float)
         norm = np.stack([pts[:, 0] / w, pts[:, 1] / h], axis=1)
         polygon = norm.round(4).tolist()
@@ -39,6 +40,7 @@ def segment_with_yolo(img: Image, weights_path: Path) -> List[Tooth]:
             box=[round(float(norm[:, 0].min()), 4), round(float(norm[:, 1].min()), 4),
                  round(float(norm[:, 0].max()), 4), round(float(norm[:, 1].max()), 4)],
             angle=_pca(norm),
+            confidence=round(float(score), 3),
         ))
     return teeth
 

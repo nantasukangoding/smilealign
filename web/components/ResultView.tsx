@@ -234,7 +234,7 @@ export function ResultView({
             )}
             <div className="mt-3 flex items-center gap-2 text-[13px] text-ink-soft">
               <AlertIcon className="h-4 w-4 text-sedang" />
-              Angka keyakinan berasal dari aturan geometris, bukan probabilitas diagnosis.
+              Angka keyakinan berasal dari skor model segmentasi pada gigi yang bersangkutan.
             </div>
           </>
         )}

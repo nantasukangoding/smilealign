@@ -10,11 +10,10 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 
+from app.analysis.geometry import dedupe_teeth, split_jaws
 from app.schemas import Bracket, JawNote, Overlay, Tooth
 
 JAW_MIN_TEETH = 6
-GAP_RATIO = 2.5
-GAP_MIN_HEIGHT = 0.6
 SNAP_UP_RATIO = 0.15
 BRACKET_WIDTH_RATIO = 0.45
 ANGLE_LIMIT = 30.0
@@ -46,54 +45,6 @@ def _catmull_rom_path(pts: Sequence[Tuple[float, float]]) -> str:
         c2 = (p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0)
         d.append(f"C{c1[0]:.4f} {c1[1]:.4f} {c2[0]:.4f} {c2[1]:.4f} {p2[0]:.4f} {p2[1]:.4f}")
     return " ".join(d)
-
-
-def _split_jaws(teeth: List[Tooth]) -> List[List[Tooth]]:
-    """Klaster gigi jadi satu atau dua baris memakai celah vertikal terbesar.
-
-    Celah dianggap pemisah rahang bila jauh melebihi selang antar gigi lain
-    dan sepadan dengan tinggi mahkota gigi. Baris pertama berada lebih atas.
-    """
-    if len(teeth) < 4:
-        return [teeth]
-    ordered = sorted(teeth, key=lambda t: t.centroid[1])
-    ys = [t.centroid[1] for t in ordered]
-    gaps: List[Tuple[float, int]] = [(ys[i + 1] - ys[i], i) for i in range(len(ordered) - 1)]
-    if not gaps:
-        return [teeth]
-    by_size = sorted(gaps, reverse=True)
-    largest, idx = by_size[0]
-    heights = [t.box[3] - t.box[1] for t in teeth]
-    h_med = float(np.median(heights))
-    if largest < GAP_MIN_HEIGHT * h_med or (len(by_size) > 1 and largest < GAP_RATIO * by_size[1][0]):
-        return [teeth]
-    upper, lower = ordered[: idx + 1], ordered[idx + 1:]
-    if len(upper) < 2 or len(lower) < 2:
-        return [teeth]
-    return [upper, lower]
-
-
-def _dedupe(teeth: Sequence[Tooth]) -> List[Tooth]:
-    """Buang deteksi ganda untuk satu gigi yang sama.
-
-    Model kadang mengeluarkan dua mask untuk satu gigi, dengan pusat nyaris
-    identik. Ambangnya sengaja ketat: gigi bertetangga yang berdesakan punya
-    pusat berbeda dan harus tetap dihitung.
-    """
-    if not teeth:
-        return []
-    keep: List[Tooth] = []
-    for t in sorted(teeth, key=lambda x: (x.box[2] - x.box[0]) * (x.box[3] - x.box[1]), reverse=True):
-        w_t = t.box[2] - t.box[0]
-        h_t = t.box[3] - t.box[1]
-        dup = any(
-            abs(t.centroid[0] - k.centroid[0]) < 0.1 * min(w_t, k.box[2] - k.box[0])
-            and abs(t.centroid[1] - k.centroid[1]) < 0.1 * min(h_t, k.box[3] - k.box[1])
-            for k in keep
-        )
-        if not dup:
-            keep.append(t)
-    return sorted(keep, key=lambda x: x.index)
 
 
 def _snap_to_curve(jaw: Sequence[Tooth], label: str = "gigi") -> Tuple[List[Bracket], str]:
@@ -154,13 +105,13 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
     """Kembalikan Overlay: bracket per rahang + archwire per rahang + catatan rahang kurang terbaca."""
     if not teeth:
         return Overlay(teeth=[], brackets=[], archwires=[])
-    jaws = _split_jaws(teeth)
+    jaws = split_jaws(teeth)
     labels = ["atas", "bawah"] if len(jaws) == 2 else ["gigi"]
     brackets: List[Bracket] = []
     archwires: List[str] = []
     notes: List[JawNote] = []
     for jaw, label in zip(jaws, labels):
-        jaw = _dedupe(jaw)
+        jaw = dedupe_teeth(jaw)
         if len(jaw) < JAW_MIN_TEETH:
             if label != "gigi":
                 notes.append(JawNote(

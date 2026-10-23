@@ -136,7 +136,7 @@ def test_spacing_detection_when_gaps_wide():
     from app.schemas import Tooth
     pts = []
     for i in range(6):
-        cx = 0.1 + i * 0.16
+        cx = 0.1 + i * 0.10
         rx, ry = 0.03, 0.04
         t = np.linspace(0, 2 * math.pi, 24, endpoint=False)
         poly = np.stack([cx + rx * np.cos(t), 0.5 + ry * np.sin(t)], axis=1).tolist()
