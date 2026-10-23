@@ -218,9 +218,7 @@ export function HomeView() {
         </section>
 
         <section className={`${s.block} ${s.wrap}`} id="faq">
-          <h2 className={s.sectionTitle} style={{ textAlign: "center" }}>
-            Pertanyaan umum
-          </h2>
+          <h2 className={s.sectionTitle}>Pertanyaan umum</h2>
           <div className={s.faq}>
             {FAQ.map((item) => (
               <details key={item.q}>
