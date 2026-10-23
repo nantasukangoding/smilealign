@@ -49,7 +49,55 @@ export function HomeView() {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const cueRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [webgl, setWebgl] = useState(true);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const targets = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
+    if (!targets.length) return;
+
+    // Tanpa animasi, teks langsung ditampilkan.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      targets.forEach((el) => el.classList.add(s.revealIn));
+      return;
+    }
+
+    // IntersectionObserver tidak dipakai karena tidak menangani lompatan:
+    // saat pengguna klik tautan "FAQ", bagian yang terlewati tidak pernah
+    // berpotongan dengan layar dan akan tertinggal tak terlihat. Pemeriksaan
+    // posisi di bawah ini menampilkan semua yang sudah terlewat.
+    let pending = targets;
+    let frame = 0;
+
+    const check = () => {
+      frame = 0;
+      const limit = window.innerHeight * 0.88;
+      pending = pending.filter((el) => {
+        if (el.getBoundingClientRect().top >= limit) return true;
+        el.classList.add(s.revealIn);
+        return false;
+      });
+      if (!pending.length) window.removeEventListener("scroll", schedule);
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(check);
+    };
+
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+    check();
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -86,7 +134,7 @@ export function HomeView() {
   }, []);
 
   return (
-    <div className={s.shell} data-home>
+    <div className={s.shell} data-home ref={rootRef}>
       <canvas ref={canvasRef} className={s.fx} aria-hidden />
 
       <header className={s.nav} ref={navRef}>
@@ -173,7 +221,7 @@ export function HomeView() {
 
         <section className={s.story} id="cara-kerja" ref={storyRef}>
           <div className={`${s.wrap} ${s.sticky}`}>
-            <div className={s.storyText}>
+            <div className={s.storyText} data-reveal>
               <h2>Cara kerja</h2>
               <div className={s.cards}>
                 {STEPS.map((step, i) => (
@@ -201,7 +249,7 @@ export function HomeView() {
 
         <section className={`${s.block} ${s.soft}`} id="privasi">
           <div className={`${s.wrap} ${s.privacy}`}>
-            <div>
+            <div data-reveal>
               <span className={s.pill}>Tanpa penyimpanan</span>
               <h2>Fotomu tidak disimpan</h2>
               <p className={s.lead}>
@@ -209,7 +257,7 @@ export function HomeView() {
                 tersisa.
               </p>
             </div>
-            <ul>
+            <ul data-reveal>
               <li>Tanpa disk dan tanpa database</li>
               <li>Tidak ada log berisi isi gambar</li>
               <li>Hasil hanya ada di browser kamu</li>
@@ -218,15 +266,17 @@ export function HomeView() {
         </section>
 
         <section className={`${s.block} ${s.wrap}`} id="faq">
-          <h2 className={s.sectionTitle}>Pertanyaan umum</h2>
+          <h2 className={s.sectionTitle} data-reveal>
+            Pertanyaan umum
+          </h2>
           <div className={s.faq}>
             {FAQ.map((item) => (
-              <details key={item.q}>
+              <details key={item.q} data-reveal>
                 <summary>{item.q}</summary>
                 <p>{item.a}</p>
               </details>
             ))}
-            <details>
+            <details data-reveal>
               <summary>Dari mana sumber datanya?</summary>
               <ul>
                 <li>
@@ -258,11 +308,17 @@ export function HomeView() {
 
         <section className={`${s.block} ${s.soft} ${s.end}`}>
           <div className={s.wrap}>
-            <h2 className={s.sectionTitle}>Mulai dari satu foto</h2>
-            <p className={s.lead}>Lihat estimasi posisi gigimu sekarang.</p>
-            <Link href="/analisis" className={s.btn}>
-              Mulai Analisis
-            </Link>
+            <h2 className={s.sectionTitle} data-reveal>
+              Mulai dari satu foto
+            </h2>
+            <p className={s.lead} data-reveal>
+              Lihat estimasi posisi gigimu sekarang.
+            </p>
+            <div data-reveal>
+              <Link href="/analisis" className={s.btn}>
+                Mulai Analisis
+              </Link>
+            </div>
           </div>
         </section>
       </main>
