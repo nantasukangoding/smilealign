@@ -13,13 +13,23 @@ from PIL.Image import Image
 from app.schemas import Tooth
 
 
-def segment_with_yolo(img: Image, weights_path: Path) -> List[Tooth]:
-    try:
-        from ultralytics import YOLO
-    except ImportError as exc:
-        raise RuntimeError("paket ultralytics belum terpasang di backend") from exc
+_MODEL_CACHE: dict = {}
 
-    model = YOLO(str(weights_path))
+
+def _load_model(weights_path: Path):
+    """Muat bobot sekali saja; memuat ulang tiap request mahal, belasan ratus milidetik."""
+    key = str(weights_path)
+    if key not in _MODEL_CACHE:
+        try:
+            from ultralytics import YOLO
+        except ImportError as exc:
+            raise RuntimeError("paket ultralytics belum terpasang di backend") from exc
+        _MODEL_CACHE[key] = YOLO(key)
+    return _MODEL_CACHE[key]
+
+
+def segment_with_yolo(img: Image, weights_path: Path) -> List[Tooth]:
+    model = _load_model(weights_path)
     results = model.predict(img, conf=0.25, imgsz=960, verbose=False)
     if not results or results[0].masks is None:
         return []
