@@ -161,10 +161,10 @@
 
 .heroText h1 {
   font-family: var(--font-display);
-  font-size: clamp(2.9rem, 7vw, 5.4rem);
+  font-size: clamp(2.7rem, 6.4vw, 4.8rem);
   font-weight: 700;
-  line-height: 1.04;
-  letter-spacing: -0.025em;
+  line-height: 1.06;
+  letter-spacing: -0.022em;
   margin: 0;
 }
 
@@ -584,7 +584,7 @@
   }
 
   .heroText h1 {
-    font-size: clamp(2.2rem, 9.4vw, 3rem);
+    font-size: clamp(2.1rem, 8.8vw, 2.8rem);
   }
 
   .sub {
@@ -650,7 +650,7 @@
   }
 
   .heroText h1 {
-    font-size: 1.85rem;
+    font-size: 1.78rem;
   }
 
   .cards {
