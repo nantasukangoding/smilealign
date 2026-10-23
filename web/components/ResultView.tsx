@@ -46,7 +46,7 @@ export function ResultView({
         `${FILE_BASE}.png`
       );
     } catch {
-      setExportError("Unduh PNG gagal. Coba lagi atau gunakan Unduh Laporan (PDF).");
+      setExportError("Unduh PNG gagal. Coba lagi, atau pakai Unduh laporan (PDF).");
     }
   }
 
@@ -63,7 +63,7 @@ export function ResultView({
         `${FILE_BASE}.pdf`
       );
     } catch {
-      setExportError("Unduh PDF gagal. Coba lagi atau gunakan Unduh Simulasi (PNG).");
+      setExportError("Unduh PDF gagal. Coba lagi, atau pakai Unduh simulasi (PNG).");
     }
   }
 
@@ -83,10 +83,10 @@ export function ResultView({
         <div>
           <h2 className="font-display text-xl font-semibold">Hasil analisis</h2>
           <p className="text-[13.5px] text-ink-soft">
-            Dari {result.overlay.teeth.length} gigi tersegmentasi,{" "}
+            Dari {result.overlay.teeth.length} gigi yang terbaca,{" "}
             {result.insufficient
-              ? "arka masih terlalu sempit untuk dinilai."
-              : `${result.problems.length} indikasi terbaca. Keparahan keseluruhan: ${
+              ? "lengkungnya masih terlalu sempit untuk dinilai."
+              : `ada ${result.problems.length} indikasi. Keparahan keseluruhan: ${
                   SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity
                 }.`}
           </p>
@@ -100,8 +100,8 @@ export function ResultView({
         >
           <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
           <span>
-            <b>Mode demo.</b> Analisis dijalankan dengan segmentasi temporer berbasis pola,
-            bukan model terlatih. Begitu model segmentasi tersambung, label ini hilang otomatis.
+            <b>Mode demo.</b> Analisis memakai pendeteksi sementara berbasis pola, bukan model
+            terlatih. Label ini hilang sendiri begitu model asli tersambung.
           </span>
         </div>
       )}
@@ -136,7 +136,7 @@ export function ResultView({
           >
             <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
             <span>
-              {result.overlay.jaw_notes.map((n) => n.message).join(" ")} Behel hanya diset pada
+              {result.overlay.jaw_notes.map((n) => n.message).join(" ")} Behel hanya dipasang pada
               rahang yang terbaca jelas.
             </span>
           </div>
@@ -173,7 +173,8 @@ export function ResultView({
             <p className="mb-2 font-display text-sm font-semibold text-ink-soft">Warna karet</p>
             {type === "clear" ? (
               <p className="text-[14px] text-ink-soft">
-                Clear aligner tidak memakai karet. Pilih Metal atau Keramik untuk memilih warna.
+                Clear aligner tidak memakai karet. Pilih Logam atau Keramik kalau ingin mengatur
+                warna.
               </p>
             ) : (
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Warna karet">
@@ -225,7 +226,7 @@ export function ResultView({
               ))}
             </ul>
             <p className="mt-3 text-[13px] text-ink-soft">
-              Simulasi behel ditahan sampai foto diambil ulang yang lebih jelas.
+              Simulasi behel baru muncul setelah foto diambil ulang dengan lebih jelas.
             </p>
           </>
         ) : (
@@ -235,8 +236,8 @@ export function ResultView({
               <div className="flex items-start gap-3 rounded-xl bg-surface p-4">
                 <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                 <p className="text-[15px] text-ink">
-                  Tidak ada indikasi masalah posisi dari aturan geometris yang dipakai. Tetap
-                  lakukan kontrol ke dokter gigi minimal setiap 6 bulan.
+                  Tidak ada indikasi masalah posisi dari pengukuran geometris. Tetap periksakan
+                  gigi secara berkala.
                 </p>
               </div>
             ) : (
@@ -247,7 +248,7 @@ export function ResultView({
                       <p className="text-[15px] font-semibold">{p.label}</p>
                       <p className="text-[13px] text-ink-soft">
                         {p.affected.length > 0
-                          ? `Menyangkut gigi ${p.affected.map(toRoman).join(", ")}`
+                          ? `Pada gigi ${p.affected.map(toRoman).join(", ")}`
                           : "Sebagian gigi"}
                       </p>
                     </div>
@@ -259,32 +260,39 @@ export function ResultView({
             )}
             <div className="mt-3 flex items-center gap-2 text-[13px] text-ink-soft">
               <AlertIcon className="h-4 w-4 text-sedang" />
-              Nilai keyakinan adalah margin dari aturan geometris, bukan probabilitas diagnosis.
+              Angka keyakinan berasal dari aturan geometris, bukan probabilitas diagnosis.
             </div>
           </>
         )}
       </Card>
 
       <Card>
-        <h3 className="mb-2 font-display text-lg font-semibold">Rekomendasi umum</h3>
-        <ul className="mb-4 space-y-2">
-          {result.recommendations.map((rec, i) => (
-            <li key={i} className="flex items-start gap-2 text-[15px] text-ink">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-              {rec}
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-wrap gap-3">
+        {/* Saat foto kurang terbaca, recommendations sudah berisi tips foto yang
+            sama dengan kartu di atas. Mengulanginya di sini membuat layar
+            menampilkan daftar identik dua kali. */}
+        {!result.insufficient && (
+          <>
+            <h3 className="mb-2 font-display text-lg font-semibold">Rekomendasi umum</h3>
+            <ul className="mb-4 space-y-2">
+              {result.recommendations.map((rec, i) => (
+                <li key={i} className="flex items-start gap-2 text-[15px] text-ink">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+                  {rec}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <div className={`flex flex-wrap gap-3 ${result.insufficient ? "mt-1" : ""}`}>
           <Button onClick={exportPng} variant="secondary">
             <DownloadIcon className="h-5 w-5" />
-            Unduh Simulasi (PNG)
+            Unduh simulasi (PNG)
           </Button>
           <Button onClick={exportPdf} variant="secondary">
             <DocIcon className="h-5 w-5" />
-            Unduh Laporan (PDF)
+            Unduh laporan (PDF)
           </Button>
-          <Button onClick={() => setConsultOpen(true)}>Konsultasi ke Dokter Gigi</Button>
+          <Button onClick={() => setConsultOpen(true)}>Konsultasi ke dokter gigi</Button>
         </div>
         {exportError && (
           <p className="mt-3 flex items-center gap-2 text-[13.5px] text-berat" role="alert">
@@ -296,10 +304,10 @@ export function ResultView({
 
       <Card className="bg-surface">
         <p className="text-[13.5px] leading-relaxed text-ink-soft">
-          <b className="text-ink">Disclaimer:</b> hasil SmileAlign adalah estimasi automatis untuk
+          <b className="text-ink">Catatan:</b> hasil SmileAlign adalah perkiraan otomatis untuk
           keperluan edukasi. SmileAlign bukan alat diagnosis, tidak menggantikan pemeriksaan
-          klinik, dan tidak memberikan rencana perawatan. Keputusan langkah selanjutnya tetap di
-          dokter gigi Anda.
+          klinik, dan tidak memberi rencana perawatan. Keputusan langkah berikutnya tetap di
+          dokter gigi kamu.
         </p>
         <Button variant="ghost" className="mt-3" onClick={onRestart}>
           <RetryIcon className="h-5 w-5" />
@@ -307,9 +315,9 @@ export function ResultView({
         </Button>
       </Card>
 
-      <Modal open={consultOpen} onClose={() => setConsultOpen(false)} title="Konsultasi ke Dokter Gigi">
+      <Modal open={consultOpen} onClose={() => setConsultOpen(false)} title="Konsultasi ke dokter gigi">
         <p className="mb-3 text-[15px] text-ink">
-          Bawa ringkasan berikut saat periksa; salin untuk dibawa lewat chat atau cetak bersama
+          Bawa ringkasan ini saat periksa. Salin untuk dikirim lewat chat, atau cetak bersama
           laporan PDF.
         </p>
         <pre className="mb-4 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-surface p-4 text-[13px] leading-relaxed text-ink">
@@ -340,13 +348,10 @@ function ConfidencePill({ value }: { value: number }) {
 
 function buildSummary(result: AnalyzeResponse, type: BracesType): string {
   const jenis = BRACES_OPTIONS.find((o) => o.id === type)?.label ?? type;
-  const lines = [
-    "Ringkasan SmileAlign (estimasi edukatif, bukan diagnosis)",
-  ];
+  const lines = ["Ringkasan SmileAlign (perkiraan untuk edukasi, bukan diagnosis)"];
   if (result.insufficient) {
-    lines.push("Foto tidak terbaca cukup (arka gigi tidak lengkap). Posisi gigi belum dinilai.");
-    lines.push(`Referensi tata letak: behel ${jenis.toLowerCase()}.`);
-    lines.push("Minta pengguna mengambil ulang foto memakai tips aplikasi.");
+    lines.push("Foto belum terbaca cukup (lengkung gigi tidak lengkap). Posisi gigi belum dinilai.");
+    lines.push("Ambil ulang foto dengan tips dari aplikasi.");
     return lines.join("\n");
   }
   lines.push(
@@ -355,7 +360,7 @@ function buildSummary(result: AnalyzeResponse, type: BracesType): string {
   lines.push(
     result.problems.length > 0
       ? "Temuan dari foto:"
-      : "Tidak ada indikasi masalah posisi dari aturan geometris."
+      : "Tidak ada indikasi masalah posisi dari pengukuran geometris."
   );
   for (const p of result.problems) {
     lines.push(
@@ -364,7 +369,7 @@ function buildSummary(result: AnalyzeResponse, type: BracesType): string {
         `, keparahan ${p.severity}, keyakinan ${Math.round(p.confidence * 100)}%`
     );
   }
-  lines.push(`Sedang mempertimbangkan: behel ${jenis.toLowerCase()}.`);
-  lines.push("Salin baris ini untuk memulai diskusi dengan dokter gigi ortodontik.");
+  lines.push(`Jenis behel pada simulasi: ${jenis.toLowerCase()}.`);
+  lines.push("Bawa ringkasan ini saat konsultasi ke dokter gigi ortodontik.");
   return lines.join("\n");
 }

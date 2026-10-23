@@ -14,19 +14,18 @@ export function ConsentStep({ onAgree }: { onAgree: () => void }) {
         <h2 className="font-display text-xl font-semibold">Persetujuan dan privasi</h2>
       </div>
       <p className="mb-3 text-[15px] leading-relaxed text-ink">
-        Sebelum analisis, tanggapi komentar singkat ini supaya kebijakan foto SmileAlign
-        sejalan dengan aturan yang Anda harapkan.
+        Sebelum mulai, baca ringkasan berikut lalu centang persetujuannya.
       </p>
       <ul className="mb-4 space-y-2 text-[15px] text-ink">
-        <Bullet>Foto hanya diproses di memori server saat analisis, tidak disimpan.</Bullet>
-        <Bullet>Sesudah hasil dikirim ke browser, data di server pun selesai dan dihapus.</Bullet>
-        <Bullet>SmileAlign tidak mencatat isi foto. Log teknis hanya menyelipkan metrik, bukan piksel.</Bullet>
-        <Bullet>Kolom riwayat tidak dibuat. Kalau suatu saat dibutuhkan, riwayatnya disimpan lokal di browser, bukan di server.</Bullet>
+        <Bullet>Server hanya memproses foto di memori selama analisis.</Bullet>
+        <Bullet>Setelah hasil dikirim ke browser, server membuang data itu.</Bullet>
+        <Bullet>SmileAlign tidak mencatat isi foto. Log teknis mencatat metrik, bukan piksel.</Bullet>
+        <Bullet>Riwayat analisis tidak dibuat. Kalau nanti ada, riwayatnya disimpan di browser, bukan di server.</Bullet>
       </ul>
       <div className="mb-5 rounded-xl border border-line bg-surface p-4 text-[14px] leading-relaxed text-ink-soft">
-        <p className="mb-2 font-semibold text-ink">Yang tidak boleh diunggah</p>
-        Foto gigi dengan dokumen, kartu identitas, atau data pribadi lain di dalamnya. SmileAlign
-        perlu citra gigi saja; latar pribadi memperbesar risiko privasi.
+        <p className="mb-2 font-semibold text-ink">Yang tidak perlu diunggah</p>
+        SmileAlign hanya butuh gambar gigi. Dokumen, kartu identitas, atau data pribadi lain di
+        latar foto menambah risiko privasi.
       </div>
       <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-xl bg-surface p-4">
         <input
@@ -36,8 +35,8 @@ export function ConsentStep({ onAgree }: { onAgree: () => void }) {
           className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--color-accent)]"
         />
         <span className="text-[15px]">
-          Saya setuju foto diproses sebagaimana dijelaskan di atas dan saya paham SmileAlign
-          bukan perangkat diagnosis medis.
+          Saya setuju foto saya diproses seperti penjelasan di atas, dan saya paham SmileAlign
+          bukan alat diagnosis medis.
         </span>
       </label>
       {checked ? (

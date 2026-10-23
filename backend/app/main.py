@@ -9,7 +9,7 @@ from app.segmentation import FORCE_MOCK, _model_available
 
 app = FastAPI(title="SmileAlign API", version="0.1.0",
               description="Analisis posisi gigi + simulasi behel dari satu foto. "
-                          "Estimasi edukatif, bukan diagnosis medis.")
+                          "Perkiraan edukatif, bukan diagnosis medis.")
 
 _default_origins = ("http://localhost:3000,http://127.0.0.1:3000,"
                     "http://localhost:3100,http://127.0.0.1:3100")

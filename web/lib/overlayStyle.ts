@@ -1,15 +1,15 @@
 import type { BracesType, RubberColor } from "./types";
 
 export const BRACES_OPTIONS: { id: BracesType; label: string; note: string }[] = [
-  { id: "metal", label: "Metal", note: "Bracket logam klasik, kawat seng, warna karet bisa dipilih." },
-  { id: "keramik", label: "Keramik", note: "Bracket sewarna gigi, lebih samar, karet tetap bisa dipilih." },
-  { id: "clear", label: "Clear aligner", note: "Plat transparan tahan lepas, tanpa kawat dan tanpa karet." },
+  { id: "metal", label: "Logam", note: "Bracket dan kawat logam, warna karet bisa dipilih." },
+  { id: "keramik", label: "Keramik", note: "Bracket sewarna gigi, tampil lebih samar, karet tetap bisa dipilih." },
+  { id: "clear", label: "Clear aligner", note: "Plat transparan yang bisa dilepas, tanpa kawat dan tanpa karet." },
 ];
 
 export const RUBBER_COLORS: RubberColor[] = [
-  { id: "silver", label: "Silver", hex: "#cfd6d9" },
+  { id: "silver", label: "Perak", hex: "#cfd6d9" },
   { id: "biru", label: "Biru", hex: "#7fb4d8" },
-  { id: "pink", label: "Pink", hex: "#e2a3ae" },
+  { id: "pink", label: "Merah muda", hex: "#e2a3ae" },
 ];
 
 export const WIRE_COLOR = "#aeb8bf";

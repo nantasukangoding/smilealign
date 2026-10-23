@@ -9,12 +9,12 @@ type MediaError = { name: string; message?: string };
 
 function describeCameraError(err: MediaError): string {
   if (err.name === "NotAllowedError")
-    return "Izin kamera ditolak. Beri izin di pengaturan browser, atau gunakan opsi unggah.";
+    return "Izin kamera ditolak. Beri izin lewat pengaturan browser, atau pakai opsi unggah.";
   if (err.name === "NotFoundError")
-    return "Kamera tidak ditemukan di perangkat ini. Gunakan opsi unggah.";
+    return "Perangkat ini tidak punya kamera. Pakai opsi unggah.";
   if (err.name === "NotReadableError")
     return "Kamera sedang dipakai aplikasi lain. Tutup aplikasinya lalu coba lagi.";
-  return "Kamera tidak bisa dibuka. Gunakan opsi unggah.";
+  return "Kamera tidak bisa dibuka. Pakai opsi unggah.";
 }
 
 export function CaptureStep({
@@ -37,11 +37,11 @@ export function CaptureStep({
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`flex-1 rounded-full px-4 py-2 font-display text-sm font-semibold capitalize ${
+            className={`flex-1 rounded-full px-4 py-2 font-display text-sm font-semibold ${
               tab === t ? "bg-white text-ink shadow" : "text-ink-soft hover:text-ink"
             }`}
           >
-            {`Ambil ${t === "kamera" ? "via kamera" : "dari berkas"}`}
+            {`Ambil ${t === "kamera" ? "lewat kamera" : "dari berkas"}`}
           </button>
         ))}
       </div>
@@ -158,7 +158,7 @@ function CameraPane({
             />
           </svg>
           <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[13px] font-semibold text-white drop-shadow">
-            Bidik senyum di dalam garis, gigi atas dan bawah terlihat
+            Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat
           </p>
         </div>
       ) : (
@@ -175,22 +175,22 @@ function CameraPane({
           <>
             <Button onClick={capture} aria-label="Ambil foto senyum">
               <CameraIcon className="h-5 w-5" />
-              Ambil Foto
+              Ambil foto
             </Button>
             <Button variant="secondary" aria-label="Ganti kamera depan atau belakang" onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}>
               <FlipCameraIcon className="h-5 w-5" />
-              Ganti Kamera
+              Ganti kamera
             </Button>
           </>
         ) : status === "error" ? (
           <>
             <Button variant="secondary" onClick={() => { setStatus("idle"); }}>
               <RetryIcon className="h-5 w-5" />
-              Coba Kamera Lagi
+              Coba kamera lagi
             </Button>
             <Button onClick={onSwitch} aria-label="Pindah ke unggah berkas">
               <UploadIcon className="h-5 w-5" />
-              Unggah Berkas
+              Unggah berkas
             </Button>
           </>
         ) : (
@@ -243,9 +243,9 @@ function UploadPane({ onUpload }: { onUpload: (file: File) => void }) {
         }`}
       >
         <UploadIcon className="h-9 w-9 text-accent" />
-        <span className="font-display text-[15px] font-semibold">Ambil foto dari berkas</span>
+        <span className="font-display text-[15px] font-semibold">Pilih berkas foto</span>
         <span className="text-[13.5px] text-ink-soft">
-          JPG atau PNG, paling 5 MB. Seret berkas ke sini atau klik pilih berkas
+          JPG atau PNG, maksimal 5 MB. Seret ke sini atau klik untuk memilih.
         </span>
       </button>
       <input

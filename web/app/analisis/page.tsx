@@ -140,8 +140,8 @@ function PreviewPane({
         className="max-h-[60dvh] rounded-2xl border border-line"
       />
       <p className="max-w-md text-center text-[14px] text-ink-soft">
-        Pastikan seluruh gigi yang menyala terlihat dan tidak terselubungi bayangan. Foto hanya
-        diproses di memori server saat analisis.
+        Pastikan semua gigi terlihat dan tidak tertutup bayangan. Server memproses foto di memori
+        selama analisis.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" onClick={onRetry}>
@@ -170,9 +170,9 @@ function ErrorView({
       <p className="text-[15px] text-ink">{error.message}</p>
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" onClick={onBackToCapture}>
-          Coba Foto Ini Lagi
+          Coba foto ini lagi
         </Button>
-        <Button onClick={onRestart}>Mulai dari Awal</Button>
+        <Button onClick={onRestart}>Mulai dari awal</Button>
       </div>
     </Card>
   );

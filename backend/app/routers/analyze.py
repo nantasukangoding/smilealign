@@ -22,7 +22,7 @@ async def analyze(file: UploadFile = File(...)):
     teeth, mode = run_segmentation(img)
     if not teeth:
         raise HTTPException(status_code=422,
-                            detail="Tidak ada gigi yang terdeteksi. Coba foto yang lebih jelas.")
+                            detail="Tidak ada gigi yang terbaca. Coba foto yang lebih terang dan jelas.")
 
     overlay: Overlay = build_overlay(teeth)
     insufficient = not arch_coverage_ok(teeth)

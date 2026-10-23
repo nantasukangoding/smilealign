@@ -1,4 +1,4 @@
-"""Aturan geometris (Tahap 2 MVP): crowding, spacing, rotasi, gigi tonggos dari mask.
+"""Aturan geometris (Tahap 2 MVP): crowding, spacing, rotasi, dan kemiringan gigi dari mask.
 
 Semua ukuran berasal dari geometri poligon, bukan probabilitas model, sehingga
 "confidence" di sini margin aturan (validitas geometris) dan bukan probabilitas diagnosis.
@@ -17,9 +17,9 @@ from app.schemas import Problem, Tooth
 
 LABELS = {
     "crowding": "Gigi berdesakan",
-    "spacing": "Ada celah antar gigi",
-    "rotation": "Ada gigi terputar",
-    "tilt": "Ada gigi tidak sejajar (tonggos)",
+    "spacing": "Ada celah antargigi",
+    "rotation": "Ada gigi berputar",
+    "tilt": "Ada gigi tidak sejajar",
 }
 SEVERITY_RANK = {"ringan": 1, "sedang": 2, "berat": 3}
 
@@ -35,11 +35,11 @@ MIN_X_SPAN = 0.25          # rentang centroid horizontal minimal (lebar gambar)
 MAX_Y_OVER_X = 1.30        # arka tidak mungkin jauh lebih tinggi daripada lebarnya
 
 PHOTO_TIPS: List[str] = [
-    "Ambil ulang foto agar analisis bisa dibaca ulang penuh:",
-    "Jarak 10-20 cm; gigi memenuhi bingkai foto.",
-    "Cahaya terang dan merata; hindari bayangan di wajah.",
-    "Senyum lebar, bibir tidak menutupi gigi; arahkan kamera tegak lurus gigi.",
-    "Foto langsung dengan kamera, bukan memotret layar HP lain (menghindari blur dan pantulan).",
+    "Ambil ulang foto supaya seluruh gigi terbaca:",
+    "Jarak 10-20 cm, gigi memenuhi bingkai foto.",
+    "Cahaya terang dan merata, tanpa bayangan di wajah.",
+    "Senyum lebar dan bibir tidak menutupi gigi. Arahkan kamera tegak lurus ke gigi.",
+    "Pakai kamera langsung, bukan memotret layar ponsel lain, supaya hasil tidak buram.",
     "Pastikan satu rahang terlihat penuh dari geraham kiri ke kanan.",
 ]
 
@@ -164,35 +164,35 @@ def recommend(problems: List[Problem]) -> List[str]:
     out: List[str] = []
 
     if not problems:
-        out.append("Tidak ada indikasi masalah posisi dari aturan geometris yang dipakai. "
-                   "Tetap lakukan kontrol ke dokter gigi minimal tiap 6 bulan.")
-        out.append("Hasil ini bukan diagnosis; dokter gigi tetap perlu memeriksa kondisi "
-                   "bergigi dan gusi langsung.")
+        out.append("Tidak ada indikasi masalah posisi dari pengukuran geometris. "
+                   "Tetap periksakan gigi secara berkala.")
+        out.append("Hasil ini bukan diagnosis. Dokter gigi tetap perlu memeriksa gigi dan gusi "
+                   "langsung.")
         return out
 
     if overall == "berat":
-        out.append("Terdeteksi beberapa indikasi yang sebaiknya dievaluasi dokter gigi "
-                   "ortodontik dalam waktu dekat.")
+        out.append("Ada beberapa indikasi yang sebaiknya diperiksa dokter gigi ortodontik "
+                   "dalam waktu dekat.")
     elif overall == "sedang":
-        out.append("Konsultasikan ke dokter gigi untuk membandingkan pilihan perawatan, "
-                   "mulai dari behel sampai clear aligner.")
+        out.append("Bandingkan pilihan perawatan bersama dokter gigi, dari behel sampai clear "
+                   "aligner.")
     else:
-        out.append("Indikasi masih ringan. Dokter gigi bisa menentukan apakah perawatan "
-                   "dibutuhkan atau cukup dipantau.")
+        out.append("Indikasinya masih ringan. Dokter gigi bisa menentukan apakah perlu "
+                   "perawatan atau cukup dipantau.")
 
     if "crowding" in keys:
-        out.append("Desakan gigi membuat sisih (sela) sulit dibersihkan; untuk itu gunakan "
-                   "benang gigi atau sikat sela harian.")
+        out.append("Gigi berdesakan menyisakan sela sempit yang sulit dibersihkan. Pakai benang "
+                   "gigi atau sikat sela setiap hari.")
     if "spacing" in keys:
-        out.append("Celah pada barisan gigi bisa ditutup teknik orthodonti; pilihan perawatan "
-                   "dites dokter dulu supaya aman untuk akar gigi.")
+        out.append("Celah di antara gigi bisa ditutup dengan perawatan ortodonti. Dokter gigi "
+                   "akan menguji dulu keamanannya untuk akar gigi.")
     if "rotation" in keys:
-        out.append("Gigi terputar biasanya disandingkan bracket tunggal atau tali elastik; "
-                   "butuh penilaian dokter agar tidak melukai gusi.")
+        out.append("Gigi berputar biasanya dikoreksi dengan bracket tunggal atau tali elastik. "
+                   "Dokter gigi perlu menilai dulu supaya gusi tidak terluka.")
     if "tilt" in keys:
-        out.append("Gigi tonggos bisa membuat gigitan terasa timpang; minta dokter memeriksa "
-                   "sesak gigi sekaligus.")
-    out.append("Semua catatan di sini berbasis aturan geometris dari satu foto. Bukan "
+        out.append("Gigi yang tidak sejajar bisa membuat gigitan terasa timpang. Minta dokter "
+                   "gigi memeriksa gigitan sekaligus.")
+    out.append("Semua catatan di sini berasal dari pengukuran geometris satu foto. Bukan "
                "diagnosis, bukan rencana perawatan, dan tidak menggantikan pemeriksaan "
                "langsung oleh dokter gigi.")
     return out

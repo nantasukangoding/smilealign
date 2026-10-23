@@ -69,7 +69,7 @@ export function ProcessingView({
         })}
       </ul>
       <p className="text-center text-[14px] text-ink-soft">
-        Foto diproses di memori. Setelah analisis selesai, tidak ada yang tersimpan di server.
+        Server memproses foto di memori, lalu membuangnya setelah analisis selesai.
       </p>
     </div>
   );

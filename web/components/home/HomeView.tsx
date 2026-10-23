@@ -9,34 +9,34 @@ import s from "./home.module.css";
 const STEPS = [
   {
     title: "Izinkan kamera, ambil foto senyum",
-    body: "Foto diambil langsung dari browser dengan panduan posisi. Boleh juga unggah berkas JPG atau PNG, paling 5 MB.",
+    body: "Kamera langsung terbuka di browser dengan panduan posisi. Bisa juga unggah JPG atau PNG, maksimal 5 MB.",
   },
   {
     title: "Gigi dikenali satu per satu",
-    body: "Model membentuk mask tiap gigi, lalu memeriksa desakan, celah, rotasi, dan kemiringan dari geometri mask itu.",
+    body: "Model menggambar batas tiap gigi, lalu mengukur desakan, celah, putaran, dan kemiringan dari bentuk batas itu.",
   },
   {
     title: "Lihat simulasi, bawa ke dokter",
-    body: "Geser pembanding sebelum dan sesudah, pilih jenis behel dan warna karet, lalu unduh ringkasan untuk klinik.",
+    body: "Geser pembanding asli dan simulasi, pilih jenis behel dan warna karet, lalu unduh ringkasan untuk klinik.",
   },
 ];
 
 const FAQ = [
   {
     q: "Apakah ini diagnosis?",
-    a: "Bukan. Hasilnya estimasi otomatis untuk edukasi. Untuk pemeriksaan yang sebenarnya, konsultasikan ke dokter gigi.",
+    a: "Bukan. Hasilnya perkiraan otomatis untuk edukasi. Untuk pemeriksaan yang sebenarnya, konsultasikan ke dokter gigi.",
   },
   {
     q: "Foto seperti apa yang cocok?",
-    a: "Foto senyum atau foto dalam mulut yang terang dan jelas, dengan gigi terlihat penuh. Kalau gigi yang terdeteksi terlalu sedikit, kamu akan mendapat tips foto ulang, bukan hasil yang dipaksakan.",
+    a: "Foto senyum atau foto dalam mulut yang terang dan jelas, dengan gigi terlihat penuh. Kalau gigi yang terbaca terlalu sedikit, aplikasi memberi tips foto ulang dan tidak memaksakan hasil.",
   },
   {
     q: "Apakah fotoku disimpan?",
-    a: "Tidak. Foto diproses di memori server, hasilnya dikirim ke browser, lalu tidak ada yang ditulis ke disk atau database.",
+    a: "Tidak. Server memproses foto di memori, mengirim hasilnya ke browser, lalu tidak menulis apa pun ke disk atau database.",
   },
   {
     q: "Seberapa akurat hasilnya?",
-    a: "Modelnya masih tahap awal, jadi anggap hasilnya perkiraan. Foto yang lebih jelas memberi hasil yang lebih baik.",
+    a: "Modelnya masih tahap awal, jadi anggap hasilnya perkiraan. Foto yang lebih terang dan tajam membuat lebih banyak gigi terbaca.",
   },
 ];
 
@@ -146,7 +146,7 @@ export function HomeView() {
             <a href="#faq">FAQ</a>
           </nav>
           <Link href="/analisis" className={`${s.btn} ${s.navCta}`}>
-            Mulai Analisis
+            Mulai analisis
           </Link>
         </div>
       </header>
@@ -173,18 +173,18 @@ export function HomeView() {
                 senyum
               </h1>
               <p className={s.sub}>
-                Unggah foto senyummu, lihat estimasi posisi gigi dan simulasi behel di atas
+                Unggah foto senyummu, lalu lihat perkiraan posisi gigi dan simulasi behel di atas
                 fotonya.
               </p>
               <div className={s.row}>
                 <Link href="/analisis" className={s.btn}>
-                  Mulai Analisis
+                  Mulai analisis
                 </Link>
                 <a href="#cara-kerja" className={`${s.btn} ${s.btnGhost}`}>
                   Lihat cara kerja
                 </a>
               </div>
-              <p className={s.note}>Estimasi otomatis, bukan diagnosis.</p>
+              <p className={s.note}>Perkiraan otomatis, bukan diagnosis.</p>
             </div>
 
             <div className={s.stage} ref={heroSlotRef}>
@@ -199,7 +199,7 @@ export function HomeView() {
                     Behel
                   </button>
                   <div ref={cueRef} className={s.cue}>
-                    Scroll untuk memunculkan model
+                    Gulir untuk memunculkan model
                   </div>
                 </>
               ) : (
@@ -253,14 +253,14 @@ export function HomeView() {
               <span className={s.pill}>Tanpa penyimpanan</span>
               <h2>Fotomu tidak disimpan</h2>
               <p className={s.lead}>
-                Foto diproses di memori server, hasilnya dikirim ke browser, lalu tidak ada yang
-                tersisa.
+                Server memproses foto di memori, mengirim hasilnya ke browser, lalu tidak
+                menyimpan apa pun.
               </p>
             </div>
             <ul data-reveal>
-              <li>Tanpa disk dan tanpa database</li>
-              <li>Tidak ada log berisi isi gambar</li>
-              <li>Hasil hanya ada di browser kamu</li>
+              <li>Foto hidup hanya di memori selama analisis</li>
+              <li>Log mencatat metrik, bukan piksel</li>
+              <li>Hasil analisis tersimpan di browser kamu</li>
             </ul>
           </div>
         </section>
@@ -312,11 +312,11 @@ export function HomeView() {
               Mulai dari satu foto
             </h2>
             <p className={s.lead} data-reveal>
-              Lihat estimasi posisi gigimu sekarang.
+              Lihat perkiraan posisi gigimu sekarang.
             </p>
             <div data-reveal>
               <Link href="/analisis" className={s.btn}>
-                Mulai Analisis
+                Mulai analisis
               </Link>
             </div>
           </div>
@@ -326,7 +326,7 @@ export function HomeView() {
       <footer className={s.footer}>
         <div className={s.wrap}>
           <Wordmark className={s.logo} />
-          <span>Estimasi otomatis untuk edukasi, bukan diagnosis medis. Konsultasikan ke dokter gigi.</span>
+          <span>Perkiraan otomatis untuk edukasi, bukan diagnosis medis. Konsultasikan ke dokter gigi.</span>
         </div>
       </footer>
     </div>

@@ -8,7 +8,7 @@ const poppins = Poppins({ subsets: ["latin"], weight: ["600", "700"], variable: 
 export const metadata: Metadata = {
   title: "SmileAlign: Simulasi Behel dari Foto Senyum",
   description:
-    "Analisis posisi gigi dari satu foto senyum dan lihat simulasi behelnya. Estimasi edukatif, bukan diagnosis medis.",
+    "Analisis posisi gigi dari satu foto senyum dan lihat simulasi behelnya. Perkiraan edukatif, bukan diagnosis medis.",
   robots: { index: true, follow: true },
 };
 

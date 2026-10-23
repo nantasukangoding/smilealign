@@ -90,7 +90,7 @@ export async function exportSummaryPdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100);
-  doc.text("Estimasi edukatif berbasis foto. Bukan diagnosis medis.", margin, 24);
+  doc.text("Perkiraan untuk edukasi, berbasis foto. Bukan diagnosis medis.", margin, 24);
   doc.setTextColor(30);
   doc.setFontSize(10);
 
@@ -117,7 +117,7 @@ export async function exportSummaryPdf(
   y += 7;
   doc.setFont("helvetica", "normal");
   if (result.problems.length === 0) {
-    y = drawLines(doc, ["Tidak ada indikasi masalah posisi dari aturan geometris."], margin, y, contentW);
+    y = drawLines(doc, ["Tidak ada indikasi masalah posisi dari pengukuran geometris."], margin, y, contentW);
   }
   for (const p of result.problems) {
     const line = `- ${p.label} (keparahan: ${p.severity}, keyakinan: ${Math.round(
