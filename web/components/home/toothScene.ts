@@ -40,6 +40,11 @@ export interface ToothSceneOptions {
 }
 
 export interface ToothSceneHandle {
+  /** Berhenti menggambar saat halaman disembunyikan, tanpa merusak konteksnya. */
+  pause(): void;
+  /** Jalankan lagi animasi setelah halaman muncul kembali. */
+  resume(): void;
+  /** Lepas konteks hanya ketika komponen benar benar tidak dipakai lagi. */
   dispose(): void;
 }
 
@@ -256,7 +261,8 @@ export function createToothScene(opts: ToothSceneOptions): ToothSceneHandle | nu
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas: opts.canvas, antialias: true, alpha: true });
-  } catch {
+  } catch (e) {
+    console.warn("SmileAlign: konteks WebGL gagal dibuat, halaman memakai cadangan.", e);
     return null;
   }
 
@@ -313,6 +319,7 @@ export function createToothScene(opts: ToothSceneOptions): ToothSceneHandle | nu
   opts.toggle.addEventListener("click", onToggle);
 
   let raf = 0;
+  let pageAktif = true;
   let cur: { x: number; y: number; z: number } | null = null;
   let curRot: number | null = null;
   let braceT = 1;
@@ -327,10 +334,20 @@ export function createToothScene(opts: ToothSceneOptions): ToothSceneHandle | nu
   window.addEventListener("resize", resize);
   resize();
 
-  const frame = () => {
-    raf = requestAnimationFrame(frame);
-    if (document.hidden) return;
+  /** Jaga satu pengatur animasi yang hidup, cukup saat layar dan halamannya aktif. */
+  const perbaruiAnimasi = () => {
+    const jalan = pageAktif && !document.hidden;
+    if (jalan && !raf) {
+      raf = requestAnimationFrame(frame);
+    } else if (!jalan && raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  };
+  document.addEventListener("visibilitychange", perbaruiAnimasi);
 
+  const render = () => {
+    if (document.hidden) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const heroRect = opts.heroSlot.getBoundingClientRect();
@@ -455,11 +472,31 @@ export function createToothScene(opts: ToothSceneOptions): ToothSceneHandle | nu
     renderer.render(scene, camera);
   };
 
-  raf = requestAnimationFrame(frame);
+  /**
+   * Mesin penggambar dipasang: render lalu jadwalkan pemanggilan berikutnya
+   * lewat perbaruiAnimasi sehingga kadernya mengikuti laman aktif dan lapisan
+   * tab yang terlihat, bukan memanggil requestAnimationFrame sendiri sendiri.
+   */
+  const frame = () => {
+    raf = 0;
+    render();
+    perbaruiAnimasi();
+  };
 
   return {
+    resume() {
+      resize();
+      pageAktif = true;
+      perbaruiAnimasi();
+    },
+    pause() {
+      pageAktif = false;
+      perbaruiAnimasi();
+    },
     dispose() {
-      cancelAnimationFrame(raf);
+      pageAktif = false;
+      perbaruiAnimasi();
+      document.removeEventListener("visibilitychange", perbaruiAnimasi);
       window.removeEventListener("resize", resize);
       opts.toggle.removeEventListener("click", onToggle);
       scene.remove(mouth.root);

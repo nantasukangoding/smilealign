@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Wordmark } from "@/components/Wordmark";
-import { createToothScene } from "./toothScene";
+import { createToothScene, type ToothSceneHandle } from "./toothScene";
 import s from "./home.module.css";
 
 const STEPS = [
@@ -50,6 +50,7 @@ export function HomeView() {
   const cueRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<ToothSceneHandle | null>(null);
   const [webgl, setWebgl] = useState(true);
 
   useEffect(() => {
@@ -113,24 +114,32 @@ export function HomeView() {
     }
 
     const cards = Array.from(storySection.querySelectorAll<HTMLElement>("[data-card]"));
-    const scene = createToothScene({
-      canvas,
-      nav,
-      heroSlot,
-      storySection,
-      storySlot,
-      toggle,
-      cue,
-      bar,
-      cards,
-      cardOnClass: s.cardOn,
-    });
-
-    if (!scene) {
-      setWebgl(false);
-      return;
+    if (!sceneRef.current) {
+      const scene = createToothScene({
+        canvas,
+        nav,
+        heroSlot,
+        storySection,
+        storySlot,
+        toggle,
+        cue,
+        bar,
+        cards,
+        cardOnClass: s.cardOn,
+      });
+      if (!scene) {
+        setWebgl(false);
+        return;
+      }
+      sceneRef.current = scene;
     }
-    return () => scene.dispose();
+    // Next.js (cacheComponents) memakai Activity: halaman yang ditinggalkan
+    // tidak dibongkar, melainkan disembunyikan sambil menahan DOM kanvasnya.
+    // Karena itu scene dijeda, bukan dilepas. Konteks WebGL yang dipaksa mati
+    // tidak bisa dibuat ulang di kanvas yang sama, dan inilah yang membuat
+    // model 3D hilang saat pengguna kembali ke halaman depan.
+    sceneRef.current.resume();
+    return () => sceneRef.current?.pause();
   }, []);
 
   return (
