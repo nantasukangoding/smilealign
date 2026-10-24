@@ -15,8 +15,9 @@ from typing import List, Sequence
 
 import numpy as np
 
-from app.analysis.geometry import (arch_midline, axis_deviation_deg, curvature_offset_y,
-                                   dedupe_teeth, fit_arch, median_width, split_jaws,
+from app.analysis.geometry import (arch_midline, axis_deviation_deg, box_gap,
+                                   curvature_offset_y, dedupe_teeth, fit_arch,
+                                   mask_iou, median_width, split_jaws,
                                    tooth_width)
 from app.schemas import Problem, Tooth
 
@@ -28,15 +29,24 @@ LABELS = {
 }
 SEVERITY_RANK = {"ringan": 1, "sedang": 2, "berat": 3}
 
-# Rasio = jarak pusat dua gigi bertetangga / jumlah setengah lebar keduanya.
-# Dua gigi yang bersentuhan punya rasio sekitar 1.0.
-CROWD_TOUCH = 0.97        # di bawah ini dianggap bertumpuk
-CROWD_MILD, CROWD_HEAVY = 0.90, 0.78
-CROWD_MIN_TRUST = 0.55    # di bawah ini hampir pasti dua deteksi untuk satu gigi
-SPACING_OPEN, SPACING_HEAVY = 1.18, 1.55
-SPACING_MAX_TRUST = 2.0   # di atas ini lebih mungkin gigi gagal terdeteksi daripada celah sungguhan
-ROT_MILD, ROT_HEAVY = 12.0, 31.0
-TILT_MILD, TILT_HEAVY = 0.20, 0.52
+# Crowding diukur dari mask dua gigi yang benar-benar menutupi area yang sama,
+# bukan dari jarak pusat. Kotak pembatas selalu tumpuk di sela antargigi karena
+# mask yang sedikit melebar, sehingga ukuran jarak pusat melapor berdesakan
+# bahkan pada gigi yang tersusun rapi. Nilai rasio dulu kini jadi seberapa banyak
+# area mask yang saling menutupi: 0 berarti hanya bersentuhan.
+CROWD_IO_MILD = 0.08      # di atas ini ada gigi saling menutup, indikasi ringan
+CROWD_IO_HEAVY = 0.18     # di atas ini tumpukan sudah sungguhan
+
+# Spacing diukur dari sela antar kotak. Kotak yang bertumpuk diberi nilai
+# negatif, jadi hanya benar-benar ada celah yang dilaporkan.
+SPACING_MILD = 0.12       # sela dari ini ke atas berarti ada celah yang terlihat
+SPACING_HEAVY = 0.35
+# Rotasi dan tilt memakai ambang tinggi: posisi gigi di tepi kurva arka punya
+# sumbu PCA yang mirip antara gigi supine dan gigi miring, dan salah satu gigi
+# gagal terdeteksi pun membaca seperti renggang. Temuan dari satu pasangan saja
+# tidak naik ke berat karena belum cukup bukti.
+ROT_MILD, ROT_HEAVY = 18.0, 40.0
+TILT_MILD, TILT_HEAVY = 0.25, 0.52
 
 # Pengaman data: aturan hanya sah bila arka gigi terlihat cukup lengkap.
 MIN_TEETH_FOR_RULES = 8    # di bawah ini, arka dianggap terlalu sedikit untuk dinilai
@@ -56,8 +66,8 @@ PHOTO_TIPS: List[str] = [
 ]
 
 _THRESHOLDS = {
-    "crowding": (CROWD_MILD, CROWD_HEAVY, "down"),
-    "spacing": (SPACING_OPEN, SPACING_HEAVY, "up"),
+    "crowding": (CROWD_IO_MILD, CROWD_IO_HEAVY, "up"),
+    "spacing": (SPACING_MILD, SPACING_HEAVY, "up"),
     "rotation": (ROT_MILD, ROT_HEAVY, "up"),
     "tilt": (TILT_MILD, TILT_HEAVY, "up"),
 }
@@ -65,10 +75,6 @@ _THRESHOLDS = {
 
 def _severity(value: float, key: str) -> str:
     mild, heavy, direction = _THRESHOLDS[key]
-    if direction == "down":
-        if value < heavy:
-            return "berat"
-        return "sedang" if value < mild else "ringan"
     if value > heavy:
         return "berat"
     return "sedang" if value > mild else "ringan"
@@ -137,14 +143,13 @@ def _jaw_problems(jaw: Sequence[Tooth]) -> List[Problem]:
 
     crowded, spaced = [], []
     for a, b in zip(anterior, anterior[1:]):
-        half = (tooth_width(a) + tooth_width(b)) / 2 or 1e-6
-        ratio = abs(b.centroid[0] - a.centroid[0]) / half
         pair = [a.index, b.index]
-        if ratio < CROWD_TOUCH:
-            crowded.append((ratio, pair))
-        elif SPACING_OPEN < ratio <= SPACING_MAX_TRUST:
-            spaced.append((ratio, pair))
-    crowded = [c for c in crowded if c[0] >= CROWD_MIN_TRUST]
+        io = mask_iou(a, b)
+        gap = box_gap(a, b)
+        if io >= CROWD_IO_MILD:
+            crowded.append((io, pair))
+        elif gap >= SPACING_MILD:
+            spaced.append((gap, pair))
 
     rotate = {}
     for t in anterior:
@@ -168,9 +173,14 @@ def _jaw_problems(jaw: Sequence[Tooth]) -> List[Problem]:
             affected=sorted({i for _, ids in crowded for i in ids}),
         ))
     if spaced:
+        # Satu sela tidak bisa dibedakan dari gigi yang gagal terdeteksi, jadi
+        # pasangan tunggal tidak naik ke berat meski selanya lebar.
         value, _ = max(spaced, key=lambda c: c[0])
+        severity = _severity(value, "spacing")
+        if len(spaced) == 1 and severity == "berat":
+            severity = "sedang"
         problems.append(Problem(
-            key="spacing", label=LABELS["spacing"], severity=_severity(value, "spacing"),
+            key="spacing", label=LABELS["spacing"], severity=severity,
             confidence=_score([by_index[i] for _, ids in spaced for i in ids]),
             affected=sorted({i for _, ids in spaced for i in ids}),
         ))

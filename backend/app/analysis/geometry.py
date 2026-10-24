@@ -16,6 +16,17 @@ DUPLICATE_CENTROID = 0.5
 JAW_GAP_RATIO = 2.5
 JAW_GAP_MIN_HEIGHT = 0.6
 
+# Rahang yang bertautan (mulut hampir tertutup) tidak menyisakan celah vertikal.
+# Diskriminatornya bukan ambang posisi, melainkan kecocokan kurva: satu arka
+# harus bisa dijelaskan satu parabola. Bila tidak, dan tiap kelompok hasil
+# pengelompokan muat parabolanya sendiri, berarti gigi atas dan bawah tercampur.
+JAW_CLUSTER_MIN = 4       # tiap kelompok minimal punya segini gigi
+JAW_RESIDUAL_BAD = 0.30   # sisa fit gabungan di atas ini berarti satu arka tidak muat
+JAW_RESIDUAL_OK = 0.20    # sisa fit tiap kelompok di bawah ini berarti tiap arka muat
+
+# Resolusi peta 2D untuk mengukur tumpukan mask antara dua gigi.
+RASTER_SIZE = 256
+
 
 def tooth_axes(tooth: Tooth) -> tuple:
     """Sumbu panjang/pendek gigi dalam koordinat normalisasi.
@@ -83,12 +94,14 @@ def dedupe_teeth(teeth: Sequence[Tooth]) -> List[Tooth]:
 
 
 def split_jaws(teeth: Sequence[Tooth]) -> List[List[Tooth]]:
-    """Pisahkan gigi jadi baris atas dan bawah bila ada celah vertikal yang jelas.
+    """Pisahkan gigi jadi baris atas dan bawah bila ada bukti dua arka.
 
-    Gigi diurutkan menurut y lalu dicari celah terbesar. Celah itu dianggap
-    batas rahang hanya kalau cukup tinggi dibanding tinggi mahkota dan jelas
-    lebih besar daripada celah kedua. Selain itu, semua gigi dianggap satu baris
-    supaya foto satu rahang tetap terbaca.
+    Cara pertama mencari celah vertikal terbesar, cukup untuk mulut yang
+    terbuka. Cara kedua menangkap mulut yang hampir tertutup, ketika gigi atas
+    dan bawah bertautan sehingga celahnya rapat: di sana satu parabola tidak
+    mungkin memuat dua arka sekaligus, sedangkan tiap kelompok hasil
+    pengelompokan memuat parabolanya sendiri. Kalau tidak ada bukti keduanya,
+    semua gigi dianggap satu baris supaya foto satu rahang tetap terbaca.
     """
     if not teeth:
         return []
@@ -98,18 +111,54 @@ def split_jaws(teeth: Sequence[Tooth]) -> List[List[Tooth]]:
         for i in range(len(ordered) - 1)
     ]
     if not gaps:
-        return [list(ordered)]
+        return _cluster_jaws(ordered)
     by_size = sorted(gaps, reverse=True)
     largest, idx = by_size[0]
     h_med = float(np.median([tooth_height(t) for t in teeth]))
     if largest < JAW_GAP_MIN_HEIGHT * h_med:
-        return [list(ordered)]
+        return _cluster_jaws(ordered)
     if len(by_size) > 1 and largest < JAW_GAP_RATIO * by_size[1][0]:
-        return [list(ordered)]
+        return _cluster_jaws(ordered)
     upper, lower = ordered[: idx + 1], ordered[idx + 1:]
     if len(upper) < 2 or len(lower) < 2:
-        return [list(ordered)]
+        return _cluster_jaws(ordered)
     return [upper, lower]
+
+
+def _cluster_jaws(teeth: Sequence[Tooth]) -> List[List[Tooth]]:
+    """Kelompokkan gigi menurut y bila satu parabola tidak memuat semuanya."""
+    if len(teeth) < 2 * JAW_CLUSTER_MIN:
+        return [list(teeth)]
+    h_med = float(np.median([tooth_height(t) for t in teeth])) or 1e-6
+    y = np.asarray([t.centroid[1] for t in teeth], dtype=float)
+    centers = np.array([y.min(), y.max()])
+    labels = np.zeros(len(y), dtype=int)
+    for _ in range(60):
+        labels = np.abs(y[:, None] - centers[None, :]).argmin(axis=1)
+        new = np.array([
+            y[labels == k].mean() if (labels == k).any() else centers[k]
+            for k in (0, 1)
+        ])
+        if np.allclose(new, centers):
+            break
+        centers = new
+    groups = [[t for t, k in zip(teeth, labels) if k == j] for j in (0, 1)]
+    if min(len(g) for g in groups) < JAW_CLUSTER_MIN:
+        return [list(teeth)]
+
+    _, whole = fit_arch(list(teeth))
+    per: List[float] = []
+    for g in groups:
+        _, curve = fit_arch(g)
+        resid = [abs(curvature_offset_y(curve, t.centroid[0], t.centroid[1])) for t in g]
+        per.append(float(np.sqrt(np.mean(np.square(resid)))) / h_med)
+    groups.sort(key=lambda g: float(np.mean([t.centroid[1] for t in g])))
+    if per[0] > JAW_RESIDUAL_OK or per[1] > JAW_RESIDUAL_OK:
+        return [list(teeth)]
+    resid = [abs(curvature_offset_y(whole, t.centroid[0], t.centroid[1])) for t in teeth]
+    if float(np.sqrt(np.mean(np.square(resid)))) / h_med <= JAW_RESIDUAL_BAD:
+        return [list(teeth)]
+    return [groups[0], groups[1]]
 
 
 def fit_arch(teeth: List[Tooth]):
@@ -148,6 +197,52 @@ def tangent_angle_deg(coeffs, x: float) -> float:
 def curvature_offset_y(coeffs, x: float, y: float) -> float:
     a, b, c = coeffs
     return float(y - (a * x * x + b * x + c))
+
+
+def _rasterize(polygon, size: int = RASTER_SIZE) -> np.ndarray:
+    """Gambar poligon ke peta 2D boolean memakai aturan ganjil-genap."""
+    p = np.asarray(polygon, dtype=float) * (size - 1)
+    xs, ys = p[:, 0], p[:, 1]
+    inside = np.zeros((size, size), dtype=bool)
+    yy, xx = np.mgrid[0:size, 0:size]
+    n = len(xs)
+    for i in range(n):
+        x1, y1, x2, y2 = xs[i], ys[i], xs[(i + 1) % n], ys[(i + 1) % n]
+        if y1 == y2:
+            continue
+        cut = (yy - y1) * (x2 - x1) / (y2 - y1) + x1
+        crossing = (y1 > yy) != (y2 > yy)
+        inside ^= crossing & (xx < cut)
+    return inside
+
+
+def mask_iou(a: Tooth, b: Tooth) -> float:
+    """Proporsi mask dua gigi yang benar-benar menutupi area yang sama.
+
+    Kotak pembatas selalu meluap ke sela antargigi karena mask yang sedikit
+    melebar ke daerah gelap di antara gigi, jadi kotak selalu tumpuk meski gigi
+    rapi. Mask mentah jauh lebih jujur: dua gigi yang benar-benar bertumpuk
+    dilukis di area yang sama, dua gigi yang hanya bersentuhan tidak.
+    """
+    ma = _rasterize(a.polygon)
+    mb = _rasterize(b.polygon)
+    inter = int(np.count_nonzero(ma & mb))
+    union = int(np.count_nonzero(ma | mb))
+    if union == 0:
+        return 0.0
+    return inter / union
+
+
+def box_gap(a: Tooth, b: Tooth) -> float:
+    """Sela horizontal antar kotak gigi, sebagai kelipatan lebar gigi rata-rata.
+
+    Nilai positif berarti benar-benar terlihat ada celah. Kotak yang sedikit
+    bertumpuk diberi nilai negatif sehingga tidak dihitung sebagai celah.
+    """
+    mean_w = (tooth_width(a) + tooth_width(b)) / 2
+    if mean_w <= 0:
+        return 0.0
+    return (b.box[0] - a.box[2]) / mean_w
 
 
 def axis_deviation_deg(tooth: Tooth, coeffs) -> float:
