@@ -15,7 +15,7 @@ from app.schemas import Bracket, JawNote, Overlay, Tooth
 
 JAW_MIN_TEETH = 6
 SNAP_UP_RATIO = 0.15
-BRACKET_WIDTH_RATIO = 0.45
+BRACKET_WIDTH_RATIO = 0.32
 ANGLE_LIMIT = 30.0
 
 
@@ -62,8 +62,11 @@ def _snap_to_curve(jaw: Sequence[Tooth], label: str = "gigi") -> Tuple[List[Brac
 
     widths = [t.box[2] - t.box[0] for t in ordered]
     heights = [t.box[3] - t.box[1] for t in ordered]
-    size = min(0.07, max(0.018, BRACKET_WIDTH_RATIO * float(np.median(widths))))
-    height = min(0.085, size * 1.15)
+    # Ukuran bracket proporsional terhadap gigi, bukan korset tetap terhadap
+    # lebar gambar — foto close-up maupun jauh tetap mengikuti skala gigi.
+    median_w = float(np.median(widths))
+    size = BRACKET_WIDTH_RATIO * median_w
+    height = size * 1.15
     lift = SNAP_UP_RATIO * float(np.median(heights))
     direction = -1.0 if label == "bawah" else 1.0
 
