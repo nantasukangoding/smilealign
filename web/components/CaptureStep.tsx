@@ -17,6 +17,58 @@ function describeCameraError(err: MediaError): string {
   return "Kamera tidak bisa dibuka. Pakai opsi unggah.";
 }
 
+/**
+ * Skor "seberapa pas" framing di zona senyum, 0..1, dihitung di client.
+ *
+ * Murah dan sederhana: kecerahan rata-rata + porsi piksel terang (kandidat
+ * gigi) di zona tengah bingkai. Hanya untuk indikator dan pemicu auto-capture;
+ * penilaian kualitas foto yang sebenarnya tetap di server.
+ */
+function skorZonaSenyum(video: HTMLVideoElement): { skor: number; cahaya: number; gigi: number } {
+  const off = document.createElement("canvas");
+  off.width = 96;
+  off.height = 72;
+  const ctx = off.getContext("2d", { willReadFrequently: true });
+  if (!ctx || !video.videoWidth) return { skor: 0, cahaya: 0, gigi: 0 };
+
+  // Zona senyum: band tengah yang lebar (sama dengan bingkai panduan).
+  const sx = off.width * 0.14;
+  const sy = off.height * 0.24;
+  const sw = off.width * 0.72;
+  const sh = off.height * 0.46;
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, off.width, off.height);
+  const { data } = ctx.getImageData(0, 0, off.width, off.height);
+
+  let terang = 0;
+  let jumlah = 0;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    sum += luma;
+    jumlah += 1;
+    if (luma > 165) terang += 1; // piksel terang: kandidat gigi
+  }
+  const rata = sum / Math.max(1, jumlah);
+  const porsiTerang = terang / Math.max(1, jumlah);
+
+  // Ambang longgar: tujuannya memandu jarak & cahaya, bukan menolak foto.
+  const skorCahaya = Math.min(1, Math.max(0, (rata - 35) / 65)); // 35..100 → 0..1
+  const skorGigi =
+    porsiTerang >= 0.02 && porsiTerang <= 0.6
+      ? 1
+      : porsiTerang < 0.02
+        ? porsiTerang / 0.02
+        : Math.max(0, 1 - (porsiTerang - 0.6) / 0.2);
+  return {
+    skor: Math.min(1, skorCahaya * 0.5 + skorGigi * 0.5),
+    cahaya: skorCahaya,
+    gigi: skorGigi,
+  };
+}
+
+const AMBANG_PAS = 0.45; // skor minimal untuk dianggap "posisi pas"
+const STABIL_MS = 1200; // harus stabil selama ini sebelum auto-capture
+
 export function CaptureStep({
   onCaptured,
   onUpload,
@@ -69,6 +121,16 @@ function CameraPane({
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [skor, setSkor] = useState(0);
+  const [cahaya, setCahaya] = useState(0);
+  const [gigi, setGigi] = useState(0);
+  const [auto, setAuto] = useState(true);
+  const [hitung, setHitung] = useState<number | null>(null); // detik tersisa
+  const skorRef = useRef(0);
+  const pasSejakRef = useRef<number | null>(null);
+  const autoRef = useRef(true);
+  autoRef.current = auto;
+
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -105,7 +167,7 @@ function CameraPane({
     };
   }, [facing, stopStream]);
 
-  const capture = () => {
+  const capture = useCallback(() => {
     const video = videoRef.current;
     if (!video || status !== "ready") return;
     const canvas = document.createElement("canvas");
@@ -126,7 +188,40 @@ function CameraPane({
       "image/jpeg",
       0.92
     );
-  };
+  }, [facing, onCaptured, status]);
+
+  // Loop penilaian framing: update skor + jalankan auto-capture saat stabil.
+  useEffect(() => {
+    if (status !== "ready") return;
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      const s = skorZonaSenyum(video);
+      skorRef.current = s.skor;
+      setSkor(s.skor);
+      setCahaya(s.cahaya);
+      setGigi(s.gigi);
+
+      const pas = s.skor >= AMBANG_PAS;
+      if (pas && pasSejakRef.current === null) pasSejakRef.current = Date.now();
+      if (!pas) pasSejakRef.current = null;
+
+      if (autoRef.current && pas && pasSejakRef.current !== null) {
+        const stabil = Date.now() - pasSejakRef.current;
+        if (stabil >= STABIL_MS) {
+          pasSejakRef.current = null;
+          capture();
+        } else {
+          setHitung(Math.ceil((STABIL_MS - stabil) / 1000));
+        }
+      } else {
+        setHitung(null);
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [status, capture]);
+
+  const pas = skor >= AMBANG_PAS;
 
   return (
     <Card className="flex flex-col items-center gap-4">
@@ -138,7 +233,7 @@ function CameraPane({
             muted
             className={`h-full w-full object-cover ${facing === "user" ? "scale-x-[-1]" : ""}`}
           />
-          {/* Overlay panduan posisi gigi supaya rahang atas dan bawah terlihat */}
+          {/* Bingkai panduan: berubah solid teal saat posisi pas */}
           <svg
             viewBox="0 0 100 75"
             className="pointer-events-none absolute inset-0 h-full w-full"
@@ -151,15 +246,23 @@ function CameraPane({
               height="34"
               rx="17"
               fill="none"
-              stroke="#7fd6d4"
-              strokeWidth="0.9"
-              strokeDasharray="4 2.4"
+              stroke={pas ? "#0e7c7b" : "#7fd6d4"}
+              strokeWidth={pas ? 1.6 : 0.9}
+              strokeDasharray={pas ? undefined : "4 2.4"}
               opacity="0.95"
             />
           </svg>
           <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[13px] font-semibold text-white drop-shadow">
-            Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat
+            {pas
+              ? hitung !== null
+                ? `Posisi pas — foto otomatis dalam ${hitung}…`
+                : "Posisi pas"
+              : "Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat"}
           </p>
+          {/* Skor kecil untuk diagnosis saat indikator dianggap belum pas */}
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-semibold text-white">
+            skor {Math.round(skor * 100)} — cahaya {Math.round(cahaya * 100)}%, gigi {Math.round(gigi * 100)}%
+          </span>
         </div>
       ) : (
         <div className="w-full rounded-xl border border-line bg-surface p-5">
@@ -169,6 +272,16 @@ function CameraPane({
           </p>
         </div>
       )}
+
+      <label className="flex items-center gap-2 text-[13.5px] text-ink-soft">
+        <input
+          type="checkbox"
+          checked={auto}
+          onChange={(e) => setAuto(e.target.checked)}
+          className="h-4 w-4 accent-[color:var(--color-accent)]"
+        />
+        Foto otomatis saat posisi pas
+      </label>
 
       <div className="flex w-full flex-wrap items-center justify-center gap-3">
         {status === "ready" ? (
@@ -213,9 +326,9 @@ function UploadPane({ onUpload }: { onUpload: (file: File) => void }) {
 
   const accept = (file: File | undefined | null) => {
     if (!file) return;
-    const issue = isAcceptedImage(file);
-    if (issue) {
-      setError(issue);
+    const check = isAcceptedImage(file);
+    if (check !== null) {
+      setError(check);
       return;
     }
     setError("");
@@ -226,7 +339,6 @@ function UploadPane({ onUpload }: { onUpload: (file: File) => void }) {
     <Card className="flex flex-col items-center gap-4">
       <button
         type="button"
-        aria-label="Pilih atau jatuhkan berkas foto gigi"
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
