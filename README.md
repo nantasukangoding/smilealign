@@ -11,23 +11,79 @@ fallback bobot.
 [desain sistem](./DESIGN.md) · [dataset](./docs/DATASETS.md) ·
 [privasi](./docs/PRIVACY.md) · [backend](./backend/README.md) · [web](./web/README.md)
 
-## Jalankan (dev)
+## Mulai cepat
 
-Butuh Node 20+ dan Python 3.11.
+Prasyarat: **Node.js 20+** dan **Python 3.11+**.
 
-```bash
-# backend, di folder backend/
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
-
-# frontend, di folder web/
-npm install
-npm run dev
+```powershell
+git clone https://github.com/nantasukangoding/smilealign.git
+cd smilealign
 ```
 
-Buka http://localhost:3000 (`npm run dev -- -p 3100` bila port 3000 terpakai). Frontend
-membaca `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`, lihat `web/.env.example`).
+> Branch default (`main`) sudah berisi versi terbaru yang siap jalan. Jika repo yang kamu pakai
+> masih terasa versi lama, pastikan berada di `main` terbaru: `git checkout main && git pull`.
+
+### 1) Backend (API)
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+```
+
+Cek: `http://127.0.0.1:8000/api/health` mengembalikan `{"status":"ok","mode":"..."}`.
+
+### 2) Frontend (web + 3D)
+
+```powershell
+cd web
+npm install
+npm run dev -- --port 3100
+```
+
+`npm install` memasang semua dependensi termasuk **Three.js** untuk tampilan 3D halaman depan,
+jadi tidak perlu instalasi terpisah. Buka `http://localhost:3100`.
+
+Frontend membaca `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`, lihat `web/.env.example`).
+Salin ke `web/.env.local` bila API berjalan di alamat lain.
+
+### Mode produksi (opsional)
+
+```powershell
+cd web
+npm install
+npm run build
+npm run start -- --port 3100
+```
+
+Setiap kali kode web berubah, jalankan `npm run build` lagi sebelum `npm run start`.
+
+## Catatan penting: bobot model & hasil analisis
+
+File bobot segmentasi **tidak disertakan** di repo (`backend/models/seg/best.pt`, di-ignore) karena
+ukurannya besar. Tanpa bobot ini backend otomatis berjalan di **mode mock** (fallback), sehingga
+alur dan tampilan tetap bisa dicoba, tetapi hasil deteksi/analisis gigi akan berbeda dari mode
+model asli.
+
+- Cek mode aktif: `GET /api/health` → field `mode` bernilai `model` atau `mock`.
+- Agar analisis memakai model asli: letakkan bobot terlatih di `backend/models/seg/best.pt`
+  (hasil `scripts/train_segmentation.py` atau salin dari mesin yang sudah melatih).
+
+## Struktur repo
+
+```
+smilealign/
+├─ web/              Next.js 16 (App Router) + TypeScript + Tailwind v4, Three.js 3D, SVG overlay, ekspor PNG/PDF
+├─ backend/          FastAPI + Pillow + NumPy; runtime analisis
+│  └─ app/
+│     ├─ main.py, schemas.py, image_utils.py
+│     ├─ segmentation/   (mock.py, yolo_seg.py)
+│     ├─ analysis/       (geometry.py, rules.py, braces.py)
+│     └─ routers/analyze.py
+├─ scripts/          utilitas data/latihan (download_data.py, train_segmentation.py, dsb.)
+└─ docs/             DATASETS.md, PRIVACY.md
+```
 
 ## Arsitektur
 

@@ -33,11 +33,17 @@ Respons JSON:
 Semua koordinat ternormalisasi 0-1; `mode` menunjukkan mock atau model. Error:
 413 lewat 5 MB, 415 bukan JPG/PNG atau rusak dibaca, 422 tidak ada gigi terdeteksi.
 
+### Cek cepat
+
+`GET /api/health` → `{"status":"ok","mode":"model"|"mock"}`. Mode `mock` berarti bobot
+`models/seg/best.pt` tidak ditemukan (file ini tidak disertakan di repo) atau
+`SMILEALIGN_FORCE_MOCK=1`.
+
 ## Tes
 
 ```bash
 .venv\Scripts\python -m pytest -q
 ```
 
-Disabled model asli: set `SMILEALIGN_FORCE_MOCK=1`, aktif `=0` dengan bobot di
-`models/seg/best.pt` (hasil `scripts/train_segmentation.py`).
+Mode model: set `SMILEALIGN_FORCE_MOCK=0` dan sediakan bobot di `models/seg/best.pt` (hasil
+`scripts/train_segmentation.py`). Paksa mock untuk uji: `SMILEALIGN_FORCE_MOCK=1`.

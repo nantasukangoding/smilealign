@@ -1,20 +1,24 @@
 # SmileAlign Web
 
-Next.js 16 (App Router, TypeScript, Tailwind v4). Tampilan mobile-first, overlay simulasi
-digambar sebagai SVG di atas foto asli.
+Next.js 16 (App Router, TypeScript, Tailwind v4) dengan tampilan 3D Three.js di halaman depan.
+Tampilan mobile-first, overlay simulasi digambar sebagai SVG di atas foto asli.
 
-## BYO env (selepas lama)
+## Jalankan
 
-```bash
+```powershell
 npm install
-npm run dev
+npm run dev -- --port 3100
 ```
 
-`.env.local` (opsional):
+`npm install` memasang semua dependensi (termasuk Three.js untuk 3D). Buka `http://localhost:3100`.
+
+`.env.local` (opsional), salin dari `.env.example` bila perlu:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+Produksi: `npm run build` lalu `npm run start -- --port 3100` (build ulang tiap kali kode berubah).
 
 ## Halaman
 
