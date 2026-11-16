@@ -64,11 +64,13 @@
 
 .logo {
   text-decoration: none;
-  color: var(--color-ink);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.3rem;
-  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.logo img {
+  height: 2.2rem;
+  width: auto;
 }
 
 .navLinks {
@@ -572,9 +574,8 @@
   flex-wrap: wrap;
 }
 
-.footer .logo {
-  color: var(--color-ink-soft);
-  font-size: 0.95rem;
+.footer .logo img {
+  height: 1.6rem;
 }
 
 /* ---------- layar sempit ---------- */
