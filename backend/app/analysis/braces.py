@@ -13,7 +13,7 @@ import numpy as np
 from app.analysis.geometry import dedupe_teeth, split_jaws
 from app.schemas import Bracket, JawNote, Overlay, Tooth
 
-JAW_MIN_TEETH = 6
+JAW_MIN_TEETH = 3
 SNAP_UP_RATIO = 0.15
 BRACKET_WIDTH_RATIO = 0.32
 ANGLE_LIMIT = 30.0

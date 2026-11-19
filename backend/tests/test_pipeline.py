@@ -114,7 +114,7 @@ def test_duplicate_detection_collapses():
 
 
 def test_small_jaw_withheld_with_note():
-    teeth = _make_teeth(upper=9, lower=3)
+    teeth = _make_teeth(upper=9, lower=2)
     overlay = build_overlay(teeth)
     assert len(overlay.archwires) == 1
     assert len(overlay.brackets) == 9
@@ -125,7 +125,7 @@ def test_small_jaw_withheld_with_note():
 
 
 def test_two_small_jaws_both_notes_no_brackets():
-    teeth = _make_teeth(upper=5, lower=5)
+    teeth = _make_teeth(upper=2, lower=2)
     overlay = build_overlay(teeth)
     assert overlay.brackets == []
     assert overlay.archwires == []
