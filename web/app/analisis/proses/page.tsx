@@ -108,6 +108,15 @@ function ProcessingView() {
   );
 }
 
+/** Judul disesuaikan dengan penyebab, bukan satu label "Analisis terhenti" untuk semua. */
+function judulError(status: number | null): string {
+  if (status === 422) return "Gigi belum terbaca";
+  if (status === 413) return "Foto terlalu besar";
+  if (status === 415) return "Format foto tidak didukung";
+  if (status === null) return "Server tidak bisa dihubungi";
+  return "Analisis terhenti";
+}
+
 function ErrorView({
   error,
   onBackToCapture,
@@ -120,11 +129,26 @@ function ErrorView({
   return (
     <Card className="flex max-w-md flex-col items-center gap-4 text-center">
       <RetryIcon className="h-8 w-8 text-accent" />
-      <h2 className="font-display text-lg font-semibold">Analisis terhenti</h2>
+      <h2 className="font-display text-lg font-semibold">{judulError(error.status)}</h2>
       <p className="text-[15px] text-ink">{error.message}</p>
+
+      {error.status === 422 && (
+        <ul className="w-full space-y-2 rounded-xl bg-surface p-4 text-left text-[14px] text-ink">
+          <li>Dekatkan kamera sampai gigi memenuhi bingkai (jarak 10–20 cm).</li>
+          <li>Pastikan cahaya terang dan merata, tanpa bayangan di mulut.</li>
+          <li>Senyum lebar dan arahkan kamera tegak lurus ke gigi.</li>
+        </ul>
+      )}
+
+      {error.status === null && (
+        <p className="text-[13px] text-ink-soft">
+          Pastikan backend berjalan di alamat API, lalu coba lagi.
+        </p>
+      )}
+
       <div className="flex flex-wrap justify-center gap-3">
         <Button variant="secondary" onClick={onBackToCapture}>
-          Coba foto ini lagi
+          Pilih / ambil foto lagi
         </Button>
         <Button onClick={onRestart}>Mulai dari awal</Button>
       </div>

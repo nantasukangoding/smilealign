@@ -26,7 +26,8 @@ Produksi: `npm run build` lalu `npm run start -- --port 3100` (build ulang tiap 
 - `/analisis` keadaan stateless mesin bertahap:
   1. persetujuan & privasi (checkbox wajib)
   2. ambil foto berdasarkan kamera getUserMedia (dengan overlay panduan) atau unggah/drag-drop
-     (JPG/PNG, maks 5 MB, divalidasi sisi klien)
+     (JPG/PNG, foto sumber maks 25 MB; dikecilkan di browser ke maks 1600 px sebelum
+     dikirim, jadi request ke API tetap di bawah 5 MB)
   3. pratinjau + Ulangi/Lanjut
   4. tiga langkah proses sementara request POST /api/analyze berjalan
   5. hasil: slider perbandingan sebelum/sesudah, mask gigi bisa disorot, pilihan jenis behel

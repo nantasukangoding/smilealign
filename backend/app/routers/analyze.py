@@ -38,3 +38,26 @@ async def analyze(file: UploadFile = File(...)):
         insufficient=insufficient,
         mock=(mode == "mock"),
     )
+
+
+@router.post("/api/detect")
+async def detect(file: UploadFile = File(...)):
+    """Deteksi cepat: balikan jumlah gigi yang terbaca tanpa analisis penuh.
+
+    Dipakai auto-capture di kamera (cek beberapa kali per detik) supaya foto
+    otomatis hanya diambil saat YOLO benar-benar melihat gigi. Tidak membuat
+    overlay/bracket/aturan karena itu mahal dan tidak perlu di sini.
+    """
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    try:
+        img, _ = load_and_prepare(data)
+    except ImageError as exc:
+        status = 413 if "5 MB" in str(exc) else 415
+        raise HTTPException(status_code=status, detail=str(exc))
+
+    teeth, mode = run_segmentation(img)
+    return {
+        "found": len(teeth) >= 2,
+        "teeth": len(teeth),
+        "mode": mode,
+    }

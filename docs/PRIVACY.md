@@ -25,7 +25,9 @@ pemrosesan data pribadi.
 
 ## Ketentuan teknis
 
-- Dibatasi max 5 MB foto, JPG/PNG saja. Validasi dalam `backend/app/image_utils.py`.
+- Foto sumber JPG/PNG maks 25 MB; browser mengecilkannya ke maks 1600 px sebelum dikirim, dan
+  API tetap menolak berkas di atas 5 MB. Validasi di `web/lib/analisis-store.ts` dan
+  `backend/app/image_utils.py`.
 - Kamera browser (getUserMedia) hanya aktif setelah izin diberikan (iOS/Android prompt standar).
 - Semua koordinat mask/bracket dikirim sebagai angka normalisasi 0-1; matriks foto tidak
   dikirim ulang ke klien.

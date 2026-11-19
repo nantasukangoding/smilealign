@@ -9,7 +9,7 @@ import s from "./home.module.css";
 const STEPS = [
   {
     title: "Izinkan kamera, ambil foto senyum",
-    body: "Kamera langsung terbuka di browser dengan panduan posisi. Bisa juga unggah JPG atau PNG, maksimal 5 MB.",
+    body: "Kamera langsung terbuka di browser dengan panduan posisi. Bisa juga unggah JPG atau PNG; foto besar dikecilkan otomatis di browser.",
   },
   {
     title: "Gigi dikenali satu per satu",

@@ -38,3 +38,6 @@ models/
 uploads/
 tmp/
 anti-slop/
+
+# macOS
+.DS_Store

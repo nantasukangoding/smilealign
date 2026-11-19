@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card } from "./ui";
 import { CameraIcon, FlipCameraIcon, RetryIcon, UploadIcon, AlertIcon } from "./icons";
-import { isAcceptedImage } from "@/lib/api";
+import { isAcceptedImage, detectTeeth } from "@/lib/api";
 
 type MediaError = { name: string; message?: string };
 
@@ -51,8 +51,12 @@ function skorZonaSenyum(video: HTMLVideoElement): { skor: number; cahaya: number
   const rata = sum / Math.max(1, jumlah);
   const porsiTerang = terang / Math.max(1, jumlah);
 
-  // Ambang longgar: tujuannya memandu jarak & cahaya, bukan menolak foto.
-  const skorCahaya = Math.min(1, Math.max(0, (rata - 35) / 65)); // 35..100 → 0..1
+  // Kualitas cahaya 0..1: nyaman di luma 70..200, lalu menurun pelan saat
+  // terlalu gelap atau benar-benar silau. Skala lama mentok di luma 100,
+  // sehingga ruangan terang selalu dianggap overexpose.
+  const naik = Math.min(1, Math.max(0, (rata - 40) / 30)); // 40..70 → 0..1
+  const turun = Math.min(1, Math.max(0, (245 - rata) / 45)); // 200..245 → 1..0
+  const skorCahaya = Math.min(naik, turun);
   const skorGigi =
     porsiTerang >= 0.02 && porsiTerang <= 0.6
       ? 1
@@ -66,8 +70,14 @@ function skorZonaSenyum(video: HTMLVideoElement): { skor: number; cahaya: number
   };
 }
 
-const AMBANG_PAS = 0.45; // skor minimal untuk dianggap "posisi pas"
+const AMBANG_PAS = 0.40; // skor minimal untuk dianggap "posisi pas"
 const STABIL_MS = 1200; // harus stabil selama ini sebelum auto-capture
+// Auto-capture bukan sekadar "ada cahaya terang": framing harus layak dan
+// model YOLO di backend harus benar-benar melihat gigi (konfirmasi /api/detect).
+// Batas silau sudah masuk ke skor cahaya, jadi tidak perlu ambang atas terpisah.
+const AMBANG_CAHAYA_MIN = 0.55; // minimal kualitas cahaya
+const YOLO_INTERVAL_MS = 1200; // jeda antar cek deteksi ke backend
+const YOLO_BERLAKU_MS = 2500; // hasil "ada gigi" berlaku selama ini
 
 export function CaptureStep({
   onCaptured,
@@ -126,10 +136,13 @@ function CameraPane({
   const [gigi, setGigi] = useState(0);
   const [auto, setAuto] = useState(true);
   const [hitung, setHitung] = useState<number | null>(null); // detik tersisa
+  const [yoloStatus, setYoloStatus] = useState<"idle" | "ok" | "none" | "error">("idle");
   const skorRef = useRef(0);
   const pasSejakRef = useRef<number | null>(null);
   const autoRef = useRef(true);
-  autoRef.current = auto;
+  useEffect(() => {
+    autoRef.current = auto;
+  }, [auto]);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -190,9 +203,38 @@ function CameraPane({
     );
   }, [facing, onCaptured, status]);
 
-  // Loop penilaian framing: update skor + jalankan auto-capture saat stabil.
+  // Loop penilaian framing: update skor heuristik (murah, tiap 200ms) dan
+  // konfirmasi gigi lewat model YOLO di backend (tiap 1.2s, hanya saat framing
+  // layak). Auto-capture hanya jalan bila keduanya setuju: framing stabil dan
+  // YOLO benar-benar melihat gigi.
   useEffect(() => {
     if (status !== "ready") return;
+
+    let yoloSibuk = false; // satu request detect dalam satu waktu
+    let yoloTerakhirOk = false;
+    let yoloTerakhirMs = 0;
+
+    const frameKeFile = async (): Promise<File | null> => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) return null;
+      const canvas = document.createElement("canvas");
+      // Cukup kecil untuk cek cepat: deteksi tetap jelas pada 480px.
+      canvas.width = 480;
+      canvas.height = Math.round((video.videoHeight / video.videoWidth) * 480);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      if (facing === "user") {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.7)
+      );
+      if (!blob) return null;
+      return new File([blob], "frame.jpg", { type: "image/jpeg" });
+    };
+
     const interval = setInterval(() => {
       const video = videoRef.current;
       if (!video) return;
@@ -202,12 +244,37 @@ function CameraPane({
       setCahaya(s.cahaya);
       setGigi(s.gigi);
 
-      const pas = s.skor >= AMBANG_PAS;
-      if (pas && pasSejakRef.current === null) pasSejakRef.current = Date.now();
+      const layakCek = s.skor >= AMBANG_PAS && s.cahaya >= AMBANG_CAHAYA_MIN;
+
+      // Konfirmasi YOLO bila framing layak dan hasil cek terakhir sudah basi.
+      const sekarang = Date.now();
+      if (layakCek && !yoloSibuk && sekarang - yoloTerakhirMs > YOLO_INTERVAL_MS) {
+        yoloSibuk = true;
+        frameKeFile()
+          .then((file) => (file ? detectTeeth(file) : null))
+          .then((r) => {
+            yoloTerakhirOk = r?.found ?? false;
+            setYoloStatus(yoloTerakhirOk ? "ok" : "none");
+          })
+          .catch(() => {
+            yoloTerakhirOk = false;
+            setYoloStatus("error");
+          })
+          .finally(() => {
+            yoloTerakhirMs = Date.now();
+            yoloSibuk = false;
+          });
+      }
+
+      const pas =
+        layakCek &&
+        yoloTerakhirOk &&
+        sekarang - yoloTerakhirMs < YOLO_BERLAKU_MS;
+      if (pas && pasSejakRef.current === null) pasSejakRef.current = sekarang;
       if (!pas) pasSejakRef.current = null;
 
       if (autoRef.current && pas && pasSejakRef.current !== null) {
-        const stabil = Date.now() - pasSejakRef.current;
+        const stabil = sekarang - pasSejakRef.current;
         if (stabil >= STABIL_MS) {
           pasSejakRef.current = null;
           capture();
@@ -219,9 +286,9 @@ function CameraPane({
       }
     }, 200);
     return () => clearInterval(interval);
-  }, [status, capture]);
+  }, [status, capture, facing]);
 
-  const pas = skor >= AMBANG_PAS;
+  const pas = skor >= AMBANG_PAS && cahaya >= AMBANG_CAHAYA_MIN;
 
   return (
     <Card className="flex flex-col items-center gap-4">
@@ -257,11 +324,30 @@ function CameraPane({
               ? hitung !== null
                 ? `Posisi pas — foto otomatis dalam ${hitung}…`
                 : "Posisi pas"
-              : "Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat"}
+              : yoloStatus === "error"
+                ? "Pemeriksaan otomatis tidak tersedia — tekan Ambil foto untuk lanjut"
+                : "Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat"}
           </p>
           {/* Skor kecil untuk diagnosis saat indikator dianggap belum pas */}
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-semibold text-white">
             skor {Math.round(skor * 100)} — cahaya {Math.round(cahaya * 100)}%, gigi {Math.round(gigi * 100)}%
+          </span>
+          <span
+            className={`pointer-events-none absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white ${
+              yoloStatus === "ok"
+                ? "bg-[#0e7c7b]/85"
+                : yoloStatus === "error"
+                  ? "bg-[#a33b3b]/85"
+                  : "bg-black/50"
+            }`}
+          >
+            {yoloStatus === "ok"
+              ? "gigi terbaca"
+              : yoloStatus === "none"
+                ? "gigi belum terbaca"
+                : yoloStatus === "error"
+                  ? "model offline"
+                  : "memeriksa gigi…"}
           </span>
         </div>
       ) : (
@@ -357,7 +443,8 @@ function UploadPane({ onUpload }: { onUpload: (file: File) => void }) {
         <UploadIcon className="h-9 w-9 text-accent" />
         <span className="font-display text-[15px] font-semibold">Pilih berkas foto</span>
         <span className="text-[13.5px] text-ink-soft">
-          JPG atau PNG, maksimal 5 MB. Seret ke sini atau klik untuk memilih.
+          JPG atau PNG, maksimal 25 MB. Foto besar dikecilkan otomatis. Seret ke sini atau klik
+          untuk memilih.
         </span>
       </button>
       <input

@@ -17,12 +17,15 @@ export default function AnalisisFotoPage() {
   const [preview, setPreview] = useState<string | null>(null);
 
   useEffect(() => {
+    // sessionStorage hanya tersedia di browser; baca setelah mount agar HTML
+    // hasil server dan klien tetap sama (tidak ada hydration mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreview(bacaFoto());
   }, []);
 
   async function setFile(file: File) {
-    await simpanFoto(file);
-    setPreview(bacaFoto());
+    const dataUrl = await simpanFoto(file);
+    setPreview(dataUrl);
   }
 
   function ulangi() {
