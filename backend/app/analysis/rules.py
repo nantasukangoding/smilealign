@@ -49,12 +49,17 @@ ROT_MILD, ROT_HEAVY = 18.0, 40.0
 TILT_MILD, TILT_HEAVY = 0.25, 0.52
 
 # Pengaman data: aturan hanya sah bila arka gigi terlihat cukup lengkap.
-MIN_TEETH_FOR_RULES = 8    # di bawah ini, arka dianggap terlalu sedikit untuk dinilai
-MIN_X_SPAN = 0.25          # rentang centroid horizontal minimal (lebar gambar)
+# Lima gigi di satu rahang sudah cukup untuk menilai rahang itu (lihat
+# MIN_ANTERIOR_TEETH); batas total hanya menjaga foto yang benar-benar kosong.
+MIN_TEETH_FOR_RULES = 5    # di bawah ini, foto dianggap tidak memuat arka yang bisa dinilai
+MIN_X_SPAN = 0.20          # rentang centroid horizontal minimal (lebar gambar)
 MAX_Y_OVER_X = 1.30        # arka tidak mungkin jauh lebih tinggi daripada lebarnya
 
 # Gigi yang dinilai: enam gigi depan tiap rahang, ditentukan dari puncak kurva arka.
+# Bila satu rahang hanya terbaca lima gigi, rahang itu masih boleh dinilai dengan
+# lima gigi terdekat; di bawah ini hasilnya terlalu rapuh untuk dilaporkan.
 ANTERIOR_TEETH = 6
+MIN_ANTERIOR_TEETH = 5
 
 PHOTO_TIPS: List[str] = [
     "Ambil ulang foto supaya seluruh gigi terbaca:",
@@ -98,6 +103,24 @@ def overall_severity(problems: List[Problem]) -> str:
     return _overall(problems)
 
 
+def coverage_summary(teeth: List[Tooth]) -> dict:
+    """Ringkasan kondisi gate untuk log saat foto ditolak. Tanpa piksel pengguna."""
+    if not teeth:
+        return {"teeth": 0, "jaws": [], "x_span": 0.0, "y_span": 0.0}
+    xs = [t.centroid[0] for t in teeth]
+    ys = [t.centroid[1] for t in teeth]
+    return {
+        "teeth": len(teeth),
+        "jaws": [len(dedupe_teeth(jaw)) for jaw in split_jaws(teeth)],
+        "x_span": round(max(xs) - min(xs), 3),
+        "y_span": round(max(ys) - min(ys), 3),
+        "min_teeth": MIN_TEETH_FOR_RULES,
+        "min_x_span": MIN_X_SPAN,
+        "max_y_over_x": MAX_Y_OVER_X,
+        "min_per_jaw": MIN_ANTERIOR_TEETH,
+    }
+
+
 def arch_coverage_ok(teeth: List[Tooth]) -> bool:
     """Gate kualitas: bila False, hasil aturan tidak sah (kembalikan tips foto saja)."""
     if len(teeth) < MIN_TEETH_FOR_RULES:
@@ -110,7 +133,26 @@ def arch_coverage_ok(teeth: List[Tooth]) -> bool:
         return False
     if y_span > MAX_Y_OVER_X * x_span:
         return False
-    return any(len(dedupe_teeth(jaw)) >= ANTERIOR_TEETH for jaw in split_jaws(teeth))
+    return any(len(dedupe_teeth(jaw)) >= MIN_ANTERIOR_TEETH for jaw in split_jaws(teeth))
+
+
+def coverage_reason(teeth: List[Tooth]) -> str:
+    """Satu kalimat spesifik tentang bagian mana yang belum memenuhi gate."""
+    if not teeth:
+        return "Tidak ada gigi yang terbaca."
+    if len(teeth) < MIN_TEETH_FOR_RULES:
+        return f"Baru {len(teeth)} gigi yang terbaca; minimal {MIN_TEETH_FOR_RULES} gigi."
+    xs = [t.centroid[0] for t in teeth]
+    ys = [t.centroid[1] for t in teeth]
+    x_span = max(xs) - min(xs)
+    y_span = max(ys) - min(ys)
+    if x_span < MIN_X_SPAN:
+        return "Sebaran gigi terlalu sempit di foto; dekatkan kamera atau senyum lebih lebar."
+    if y_span > MAX_Y_OVER_X * x_span:
+        return "Lengkung gigi terlalu tegak di foto; arahkan kamera lurus ke depan gigi."
+    per_jaw = max(len(dedupe_teeth(jaw)) for jaw in split_jaws(teeth))
+    return (f"Rahang dengan gigi terbanyak hanya {per_jaw} gigi; "
+            f"minimal {MIN_ANTERIOR_TEETH} gigi per rahang.")
 
 
 def detect_problems(teeth: List[Tooth]) -> List[Problem]:
@@ -119,7 +161,7 @@ def detect_problems(teeth: List[Tooth]) -> List[Problem]:
     best: dict = {}
     for jaw in jaws:
         jaw = dedupe_teeth(jaw)
-        if len(jaw) < ANTERIOR_TEETH:
+        if len(jaw) < MIN_ANTERIOR_TEETH:
             continue
         for problem in _jaw_problems(jaw):
             prev = best.get(problem.key)

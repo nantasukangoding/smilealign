@@ -11,6 +11,7 @@ from typing import List, Sequence, Tuple
 import numpy as np
 
 from app.analysis.geometry import dedupe_teeth, split_jaws
+from app.analysis.rules import ANTERIOR_TEETH, MIN_ANTERIOR_TEETH
 from app.schemas import Bracket, JawNote, Overlay, Tooth
 
 JAW_MIN_TEETH = 3
@@ -122,6 +123,22 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
                     message=f"Rahang {label} kurang jelas, coba foto gigi tampak depan.",
                 ))
             continue
+        if label != "gigi" and len(jaw) < MIN_ANTERIOR_TEETH:
+            notes.append(JawNote(
+                jaw=label,
+                message=f"Rahang {label} hanya {len(jaw)} gigi terbaca, belum cukup untuk dinilai.",
+            ))
+        elif label != "gigi" and len(jaw) < ANTERIOR_TEETH:
+            notes.append(JawNote(
+                jaw=label,
+                message=f"Rahang {label} hanya {len(jaw)} gigi terbaca, hasil rahang ini perkiraan.",
+            ))
+        elif label == "gigi" and len(jaw) < ANTERIOR_TEETH:
+            notes.append(JawNote(
+                jaw=label,
+                message=(f"Hanya satu rahang terdeteksi ({len(jaw)} gigi), "
+                         "hasilnya perkiraan."),
+            ))
         jaw_brackets, wire = _snap_to_curve(jaw, label)
         brackets.extend(jaw_brackets)
         archwires.append(wire)
@@ -129,5 +146,5 @@ def build_overlay(teeth: List[Tooth]) -> Overlay:
         teeth=teeth,
         brackets=brackets,
         archwires=archwires,
-        jaw_notes=notes if len(jaws) == 2 else [],
+        jaw_notes=notes,
     )

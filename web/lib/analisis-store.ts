@@ -13,6 +13,8 @@
  * penuh, alur lanjut memakai lapisan memori tanpa gagal diam-diam.
  */
 
+import { detectTeeth } from "./api";
+
 const FOTO_KEY = "smilealign.foto";
 const HASIL_KEY = "smilealign.hasil";
 
@@ -55,7 +57,7 @@ function hapus(key: string) {
 }
 
 /** Muat berkas lewat <img> supaya orientasi EXIF dari foto ponsel ikut diterapkan. */
-async function muatGambar(file: File): Promise<HTMLImageElement> {
+async function muatGambar(file: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -64,6 +66,55 @@ async function muatGambar(file: File): Promise<HTMLImageElement> {
     return img;
   } finally {
     URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Potong foto unggahan ke area mulut yang ditemukan model.
+ *
+ * Foto selfie penuh biasanya membuat gigi hanya menempati sebagian kecil frame,
+ * sehingga analisis cuma menemukan segelintir gigi. Deteksi cepat di server
+ * mencari kotak mulut, lalu foto dipotong ke kotak itu sebelum disimpan.
+ * Kalau deteksi gagal, foto asli dikembalikan supaya alur tidak terblokir.
+ */
+async function potongKeMulut(blob: Blob): Promise<Blob> {
+  const sumber = new File([blob], "foto.jpg", { type: blob.type || "image/jpeg" });
+  let crop: { x: number; y: number; w: number; h: number } | null = null;
+  try {
+    const deteksi = await detectTeeth(sumber);
+    if (deteksi.teeth >= 3) crop = deteksi.crop;
+  } catch {
+    return blob;
+  }
+  if (!crop || crop.w <= 0 || crop.h <= 0) return blob;
+
+  try {
+    const img = await muatGambar(sumber);
+    const sumberLebar = img.naturalWidth || img.width;
+    const sumberTinggi = img.naturalHeight || img.height;
+    if (!sumberLebar || !sumberTinggi) return blob;
+
+    const sx = Math.min(sumberLebar - 1, Math.max(0, Math.round(sumberLebar * crop.x)));
+    const sy = Math.min(sumberTinggi - 1, Math.max(0, Math.round(sumberTinggi * crop.y)));
+    const sw = Math.min(sumberLebar - sx, Math.max(1, Math.round(sumberLebar * crop.w)));
+    const sh = Math.min(sumberTinggi - sy, Math.max(1, Math.round(sumberTinggi * crop.h)));
+
+    // Samakan dengan hasil kamera: 4:3, cukup besar untuk membaca gigi.
+    const canvas = document.createElement("canvas");
+    canvas.width = 960;
+    canvas.height = 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return blob;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+    const hasil = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", KUALITAS_JPEG)
+    );
+    return hasil ?? blob;
+  } catch {
+    return blob;
   }
 }
 
@@ -119,8 +170,18 @@ export async function dataUrlKeFile(dataUrl: string): Promise<File> {
 }
 
 /** Simpan foto (sudah dikecilkan) lalu kembalikan data URL untuk pratinjau. */
-export async function simpanFoto(file: File): Promise<string> {
-  const dataUrl = await fileKeDataUrl(await kompresFoto(file));
+export async function simpanFoto(
+  file: File,
+  opsi?: { cariMulut?: boolean }
+): Promise<string> {
+  let siap: Blob = await kompresFoto(file);
+  // Foto unggahan dipotong ke area mulut; hasil kamera sudah dipotong di
+  // CaptureStep, jadi jangan dipotong dua kali.
+  if (opsi?.cariMulut) siap = await potongKeMulut(siap);
+  const dataUrl = await fileKeDataUrl(siap);
+  // Foto baru membatalkan hasil lama: tanpa ini, /analisis/proses bisa
+  // mengarahkan ke hasil sesi sebelumnya tanpa menganalisis foto yang baru.
+  hapus(HASIL_KEY);
   simpan(FOTO_KEY, dataUrl);
   return dataUrl;
 }

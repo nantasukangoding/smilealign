@@ -60,7 +60,7 @@ export function ResultView({
           <p className="text-[13.5px] text-ink-soft">
             Dari {result.overlay.teeth.length} gigi yang terbaca,{" "}
             {result.insufficient
-              ? "lengkungnya masih terlalu sempit untuk dinilai."
+              ? "foto belum cukup lengkap untuk dinilai."
               : `ada ${result.problems.length} indikasi. Keparahan keseluruhan: ${
                   SEVERITY_LABEL[result.overall_severity] ?? result.overall_severity
                 }.`}
@@ -110,8 +110,8 @@ export function ResultView({
           >
             <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
             <span>
-              {result.overlay.jaw_notes.map((n) => n.message).join(" ")} Behel hanya dipasang pada
-              rahang yang terbaca jelas.
+              {result.overlay.jaw_notes.map((n) => n.message).join(" ")} Simulasi mengikuti
+              gigi yang benar-benar terbaca.
             </span>
           </div>
         )}
@@ -187,8 +187,10 @@ export function ResultView({
             <div className="flex items-start gap-3 rounded-xl bg-surface p-4">
               <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-sedang" />
               <p className="text-[15px] text-ink">
-                Hanya {result.overlay.teeth.length} gigi yang terbaca jelas. Analisis posisi tidak
-                dijalankan supaya tidak menyesatkan. Ikuti tips berikut lalu coba lagi:
+                {result.coverage_reason ??
+                  `Hanya ${result.overlay.teeth.length} gigi yang terbaca jelas.`}{" "}
+                Analisis posisi tidak dijalankan supaya tidak menyesatkan. Ikuti tips berikut lalu
+                coba lagi:
               </p>
             </div>
             <ul className="mt-3 space-y-2">

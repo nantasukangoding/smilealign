@@ -29,9 +29,25 @@ export function isAcceptedImage(file: File): string | null {
   return null;
 }
 
+export interface DetectCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface DetectResult {
   found: boolean;
   teeth: number;
+  raw_teeth: number;
+  jaws: number;
+  area: number;
+  confidence: number;
+  /** 0..1 seberapa lengkap gigi terlihat; 1 berarti siap difoto otomatis. */
+  progress: number;
+  ready: boolean;
+  /** Kotak mulut terbaik, ternormalisasi ke frame 4:3 yang dikirim. */
+  crop: DetectCrop;
   mode: string;
 }
 

@@ -18,66 +18,91 @@ function describeCameraError(err: MediaError): string {
 }
 
 /**
- * Skor "seberapa pas" framing di zona senyum, 0..1, dihitung di client.
+ * Pemetaan frame kamera ke kotak 4:3 yang tampil di layar.
  *
- * Murah dan sederhana: kecerahan rata-rata + porsi piksel terang (kandidat
- * gigi) di zona tengah bingkai. Hanya untuk indikator dan pemicu auto-capture;
- * penilaian kualitas foto yang sebenarnya tetap di server.
+ * Video ditampilkan dengan `object-cover` (lihat JSX di bawah), jadi sisi yang
+ * berlebih dipotong browser. Semua kotak crop dinormalisasi ke area 4:3 yang
+ * benar-benar terlihat, lalu dipetakan balik ke piksel video di sini.
  */
-function skorZonaSenyum(video: HTMLVideoElement): { skor: number; cahaya: number; gigi: number } {
+type Crop = { x: number; y: number; w: number; h: number };
+
+/** Zona awal saat model belum memberi kotak mulut. */
+const ZONA_AWAL: Crop = { x: 0.12, y: 0.2, w: 0.76, h: 0.54 };
+
+function visiVideo(video: HTMLVideoElement) {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  const arLayar = 4 / 3;
+  const arVideo = vw / vh;
+  let visW = vw;
+  let visH = vh;
+  let ox = 0;
+  let oy = 0;
+  if (arVideo > arLayar) {
+    visW = vh * arLayar;
+    ox = (vw - visW) / 2;
+  } else if (arVideo < arLayar) {
+    visH = vw / arLayar;
+    oy = (vh - visH) / 2;
+  }
+  return { visW, visH, ox, oy };
+}
+
+/** Gambar satu area (normalisasi ke frame 4:3) ke canvas, dengan cermin kamera depan. */
+function gambarArea(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  facing: "user" | "environment",
+  area: Crop
+) {
+  const { visW, visH, ox, oy } = visiVideo(video);
+  const sx = ox + visW * area.x;
+  const sy = oy + visH * area.y;
+  const sw = visW * area.w;
+  const sh = visH * area.h;
+  if (facing === "user") {
+    ctx.translate(ctx.canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, ctx.canvas.width, ctx.canvas.height);
+}
+
+/**
+ * Kualitas cahaya satu area, 0..1, dihitung di client.
+ *
+ * Hanya mengukur kecerahan. Persentase gigi tidak lagi dihitung dari piksel
+ * terang karena kulit dan bibir yang kena cahaya ikut terhitung; angka gigi
+ * sekarang datang dari model YOLO lewat /api/detect.
+ */
+function ukurCahaya(video: HTMLVideoElement, area: Crop): number {
   const off = document.createElement("canvas");
   off.width = 96;
   off.height = 72;
   const ctx = off.getContext("2d", { willReadFrequently: true });
-  if (!ctx || !video.videoWidth) return { skor: 0, cahaya: 0, gigi: 0 };
-
-  // Zona senyum: band tengah yang lebar (sama dengan bingkai panduan).
-  const sx = off.width * 0.14;
-  const sy = off.height * 0.24;
-  const sw = off.width * 0.72;
-  const sh = off.height * 0.46;
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, off.width, off.height);
+  if (!ctx || !video.videoWidth) return 0;
+  gambarArea(ctx, video, "environment", area);
   const { data } = ctx.getImageData(0, 0, off.width, off.height);
 
-  let terang = 0;
-  let jumlah = 0;
   let sum = 0;
+  let jumlah = 0;
   for (let i = 0; i < data.length; i += 4) {
-    const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    sum += luma;
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     jumlah += 1;
-    if (luma > 165) terang += 1; // piksel terang: kandidat gigi
   }
   const rata = sum / Math.max(1, jumlah);
-  const porsiTerang = terang / Math.max(1, jumlah);
 
-  // Kualitas cahaya 0..1: nyaman di luma 70..200, lalu menurun pelan saat
-  // terlalu gelap atau benar-benar silau. Skala lama mentok di luma 100,
-  // sehingga ruangan terang selalu dianggap overexpose.
+  // Nyaman di luma 70..200, lalu menurun pelan saat terlalu gelap atau silau.
   const naik = Math.min(1, Math.max(0, (rata - 40) / 30)); // 40..70 → 0..1
   const turun = Math.min(1, Math.max(0, (245 - rata) / 45)); // 200..245 → 1..0
-  const skorCahaya = Math.min(naik, turun);
-  const skorGigi =
-    porsiTerang >= 0.02 && porsiTerang <= 0.6
-      ? 1
-      : porsiTerang < 0.02
-        ? porsiTerang / 0.02
-        : Math.max(0, 1 - (porsiTerang - 0.6) / 0.2);
-  return {
-    skor: Math.min(1, skorCahaya * 0.5 + skorGigi * 0.5),
-    cahaya: skorCahaya,
-    gigi: skorGigi,
-  };
+  return Math.min(naik, turun);
 }
 
-const AMBANG_PAS = 0.40; // skor minimal untuk dianggap "posisi pas"
 const STABIL_MS = 1200; // harus stabil selama ini sebelum auto-capture
-// Auto-capture bukan sekadar "ada cahaya terang": framing harus layak dan
-// model YOLO di backend harus benar-benar melihat gigi (konfirmasi /api/detect).
-// Batas silau sudah masuk ke skor cahaya, jadi tidak perlu ambang atas terpisah.
+// Auto-capture hanya jalan bila model melihat gigi lengkap dan cahaya cukup.
+// Framing tidak lagi memakai porsi piksel terang sebagai bukti gigi.
 const AMBANG_CAHAYA_MIN = 0.55; // minimal kualitas cahaya
 const YOLO_INTERVAL_MS = 1200; // jeda antar cek deteksi ke backend
-const YOLO_BERLAKU_MS = 2500; // hasil "ada gigi" berlaku selama ini
+const YOLO_BERLAKU_MS = 3500; // hasil deteksi berlaku selama ini
 
 export function CaptureStep({
   onCaptured,
@@ -133,16 +158,21 @@ function CameraPane({
 
   const [skor, setSkor] = useState(0);
   const [cahaya, setCahaya] = useState(0);
-  const [gigi, setGigi] = useState(0);
+  const [gigi, setGigi] = useState(0); // progres model 0..1, bukan piksel
+  const [posisiPas, setPosisiPas] = useState(false);
   const [auto, setAuto] = useState(true);
   const [hitung, setHitung] = useState<number | null>(null); // detik tersisa
   const [yoloStatus, setYoloStatus] = useState<"idle" | "ok" | "none" | "error">("idle");
-  const skorRef = useRef(0);
-  const pasSejakRef = useRef<number | null>(null);
   const autoRef = useRef(true);
+  // Kotak mulut dari model. Dipakai juga saat menyimpan foto supaya area yang
+  // dianalisis sama dengan area yang dinilai model.
+  const cropRef = useRef<Crop>(ZONA_AWAL);
   useEffect(() => {
     autoRef.current = auto;
   }, [auto]);
+  useEffect(() => {
+    cropRef.current = ZONA_AWAL;
+  }, [facing]);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -184,50 +214,46 @@ function CameraPane({
     const video = videoRef.current;
     if (!video || status !== "ready") return;
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Simpan area mulut yang dipilih model (4:3), bukan seluruh frame.
+    canvas.width = 960;
+    canvas.height = 720;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    if (facing === "user") {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0);
+    gambarArea(ctx, video, facing, cropRef.current);
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
         onCaptured(new File([blob], "smilealign-capture.jpg", { type: "image/jpeg" }));
       },
       "image/jpeg",
-      0.92
+      0.9
     );
   }, [facing, onCaptured, status]);
 
-  // Loop penilaian framing: update skor heuristik (murah, tiap 200ms) dan
-  // konfirmasi gigi lewat model YOLO di backend (tiap 1.2s, hanya saat framing
-  // layak). Auto-capture hanya jalan bila keduanya setuju: framing stabil dan
-  // YOLO benar-benar melihat gigi.
+  // Loop penilaian: cahaya diukur lokal tiap 200ms, sedangkan gigi dikonfirmasi
+  // model YOLO di backend tiap 1.2s. Auto-capture hanya jalan bila model
+  // melaporkan gigi lengkap (progress 100%) dan cahaya cukup, stabil 1.2 detik.
   useEffect(() => {
     if (status !== "ready") return;
 
     let yoloSibuk = false; // satu request detect dalam satu waktu
-    let yoloTerakhirOk = false;
+    let modelProgress = 0;
+    let modelSiap = false;
+    let modelSiapMs = 0;
     let yoloTerakhirMs = 0;
+    let pasSejak: number | null = null;
 
     const frameKeFile = async (): Promise<File | null> => {
       const video = videoRef.current;
       if (!video || !video.videoWidth) return null;
       const canvas = document.createElement("canvas");
-      // Cukup kecil untuk cek cepat: deteksi tetap jelas pada 480px.
-      canvas.width = 480;
-      canvas.height = Math.round((video.videoHeight / video.videoWidth) * 480);
+      // Kirim frame 4:3 yang terlihat apa adanya; backend yang mencari dan
+      // memperbesar zona mulut, lalu mengembalikan kotak crop terbaik.
+      canvas.width = 640;
+      canvas.height = 480;
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
-      if (facing === "user") {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-      }
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      gambarArea(ctx, video, facing, { x: 0, y: 0, w: 1, h: 1 });
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.7)
       );
@@ -237,27 +263,33 @@ function CameraPane({
 
     const interval = setInterval(() => {
       const video = videoRef.current;
-      if (!video) return;
-      const s = skorZonaSenyum(video);
-      skorRef.current = s.skor;
-      setSkor(s.skor);
-      setCahaya(s.cahaya);
-      setGigi(s.gigi);
-
-      const layakCek = s.skor >= AMBANG_PAS && s.cahaya >= AMBANG_CAHAYA_MIN;
-
-      // Konfirmasi YOLO bila framing layak dan hasil cek terakhir sudah basi.
+      if (!video || !video.videoWidth) return;
       const sekarang = Date.now();
-      if (layakCek && !yoloSibuk && sekarang - yoloTerakhirMs > YOLO_INTERVAL_MS) {
+      const c = ukurCahaya(video, cropRef.current);
+
+      // Kirim frame ke model hanya saat cukup terang; frame gelap tidak akan
+      // menghasilkan deteksi dan cuma membebani server.
+      if (c >= AMBANG_CAHAYA_MIN && !yoloSibuk && sekarang - yoloTerakhirMs > YOLO_INTERVAL_MS) {
         yoloSibuk = true;
         frameKeFile()
           .then((file) => (file ? detectTeeth(file) : null))
           .then((r) => {
-            yoloTerakhirOk = r?.found ?? false;
-            setYoloStatus(yoloTerakhirOk ? "ok" : "none");
+            if (!r) return;
+            modelProgress = r.progress;
+            modelSiap = r.ready;
+            modelSiapMs = r.ready ? Date.now() : 0;
+            // Simpan kotak mulut hanya bila model benar-benar menemukan gigi;
+            // kalau tidak, pertahankan kotak terakhir supaya crop tidak liar.
+            if (r.teeth >= 3 && r.crop) {
+              cropRef.current = r.crop;
+            }
+            setGigi(r.progress);
+            setYoloStatus(r.found ? "ok" : "none");
           })
           .catch(() => {
-            yoloTerakhirOk = false;
+            modelProgress = 0;
+            modelSiap = false;
+            modelSiapMs = 0;
             setYoloStatus("error");
           })
           .finally(() => {
@@ -266,17 +298,25 @@ function CameraPane({
           });
       }
 
-      const pas =
-        layakCek &&
-        yoloTerakhirOk &&
-        sekarang - yoloTerakhirMs < YOLO_BERLAKU_MS;
-      if (pas && pasSejakRef.current === null) pasSejakRef.current = sekarang;
-      if (!pas) pasSejakRef.current = null;
+      // Hasil model yang terlalu lama dianggap basi supaya badge tidak tertinggal
+      // di 100% setelah pengguna menutup mulut atau menutup kamera.
+      const segar = sekarang - yoloTerakhirMs < YOLO_BERLAKU_MS;
+      const gambarTerlihat = segar ? modelProgress : 0;
+      const siap = segar && modelSiap && sekarang - modelSiapMs < YOLO_BERLAKU_MS;
+      const pas = siap && c >= AMBANG_CAHAYA_MIN;
 
-      if (autoRef.current && pas && pasSejakRef.current !== null) {
-        const stabil = sekarang - pasSejakRef.current;
+      setCahaya(c);
+      setGigi(gambarTerlihat);
+      setSkor(Math.min(1, c * 0.4 + gambarTerlihat * 0.6));
+      setPosisiPas(pas);
+
+      if (pas && pasSejak === null) pasSejak = sekarang;
+      if (!pas) pasSejak = null;
+
+      if (autoRef.current && pas && pasSejak !== null) {
+        const stabil = sekarang - pasSejak;
         if (stabil >= STABIL_MS) {
-          pasSejakRef.current = null;
+          pasSejak = null;
           capture();
         } else {
           setHitung(Math.ceil((STABIL_MS - stabil) / 1000));
@@ -288,7 +328,7 @@ function CameraPane({
     return () => clearInterval(interval);
   }, [status, capture, facing]);
 
-  const pas = skor >= AMBANG_PAS && cahaya >= AMBANG_CAHAYA_MIN;
+  const pas = posisiPas;
 
   return (
     <Card className="flex flex-col items-center gap-4">
@@ -307,11 +347,11 @@ function CameraPane({
             aria-hidden
           >
             <rect
-              x="14"
-              y="18"
-              width="72"
-              height="34"
-              rx="17"
+              x="12"
+              y="15"
+              width="76"
+              height="40.5"
+              rx="18"
               fill="none"
               stroke={pas ? "#0e7c7b" : "#7fd6d4"}
               strokeWidth={pas ? 1.6 : 0.9}
@@ -324,9 +364,13 @@ function CameraPane({
               ? hitung !== null
                 ? `Posisi pas — foto otomatis dalam ${hitung}…`
                 : "Posisi pas"
-              : yoloStatus === "error"
-                ? "Pemeriksaan otomatis tidak tersedia — tekan Ambil foto untuk lanjut"
-                : "Bidik senyum di dalam garis, dengan gigi atas dan bawah terlihat"}
+              : yoloStatus === "idle"
+                ? "Bidik senyum di dalam garis — memeriksa gigi…"
+                : yoloStatus === "none"
+                  ? "Bidik senyum di dalam garis — gigi belum terbaca, sesuaikan posisi"
+                  : yoloStatus === "error"
+                    ? "Pemeriksaan otomatis tidak tersedia — tekan Ambil foto untuk lanjut"
+                    : `Gigi ${Math.round(gigi * 100)}% — senyum lebih lebar, gigi atas dan bawah terlihat`}
           </p>
           {/* Skor kecil untuk diagnosis saat indikator dianggap belum pas */}
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-semibold text-white">
@@ -366,7 +410,7 @@ function CameraPane({
           onChange={(e) => setAuto(e.target.checked)}
           className="h-4 w-4 accent-[color:var(--color-accent)]"
         />
-        Foto otomatis saat posisi pas
+        Foto otomatis hanya saat gigi 100% dan posisi pas
       </label>
 
       <div className="flex w-full flex-wrap items-center justify-center gap-3">

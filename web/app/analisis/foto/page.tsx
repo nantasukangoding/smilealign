@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { CaptureStep } from "@/components/CaptureStep";
 import { RetryIcon } from "@/components/icons";
 import { AnalisisLayout } from "@/components/AnalisisLayout";
@@ -15,6 +15,7 @@ import { bacaFoto, bersihkanAlur, simpanFoto } from "@/lib/analisis-store";
 export default function AnalisisFotoPage() {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
+  const [sibuk, setSibuk] = useState(false);
 
   useEffect(() => {
     // sessionStorage hanya tersedia di browser; baca setelah mount agar HTML
@@ -23,9 +24,14 @@ export default function AnalisisFotoPage() {
     setPreview(bacaFoto());
   }, []);
 
-  async function setFile(file: File) {
-    const dataUrl = await simpanFoto(file);
-    setPreview(dataUrl);
+  async function setFile(file: File, cariMulut = false) {
+    setSibuk(true);
+    try {
+      const dataUrl = await simpanFoto(file, { cariMulut });
+      setPreview(dataUrl);
+    } finally {
+      setSibuk(false);
+    }
   }
 
   function ulangi() {
@@ -35,16 +41,32 @@ export default function AnalisisFotoPage() {
 
   return (
     <AnalisisLayout step="foto" progress="foto">
-      {preview ? (
+      {sibuk ? (
+        <MenyiapkanPane />
+      ) : preview ? (
         <PreviewPane photoUrl={preview} onRetry={ulangi} onProceed={() => router.push("/analisis/proses")} />
       ) : (
         <CaptureStep
-          onCaptured={setFile}
-          onUpload={setFile}
+          onCaptured={(file) => void setFile(file)}
+          onUpload={(file) => void setFile(file, true)}
           onCancel={() => router.push("/analisis")}
         />
       )}
     </AnalisisLayout>
+  );
+}
+
+function MenyiapkanPane() {
+  return (
+    <Card className="flex max-w-md flex-col items-center gap-3 text-center">
+      <p className="text-[15px] font-semibold text-ink" aria-live="polite">
+        Menyiapkan area gigi…
+      </p>
+      <p className="text-[13.5px] text-ink-soft">
+        Area mulut dicari otomatis supaya gigi lebih mudah terbaca. Foto tetap diproses di perangkat
+        dan server lokal.
+      </p>
+    </Card>
   );
 }
 

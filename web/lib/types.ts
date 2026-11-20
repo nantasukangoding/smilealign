@@ -52,6 +52,7 @@ export interface AnalyzeResponse {
   overall_severity: Severity;
   recommendations: string[];
   insufficient?: boolean;
+  coverage_reason?: string | null;
   mock?: boolean;
 }
 
